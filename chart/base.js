@@ -5,7 +5,8 @@ $(document).ready(function () {
 
   $.getJSON(url, function (data) {
     console.log(data[0]);
-    data = data.slice(0, 1000);
+    data1 = data.slice(0, 1000);
+    data2 = data.slice(1000, 1600);
     Highcharts.chart('container', {
       title: {
         text: 'Contextual grouping of Emojis'
@@ -34,7 +35,12 @@ $(document).ready(function () {
         }
       },
       series: [{
-        data: data
+        name: '0-1000',
+        data: data1
+      },
+      {
+        name: '1000:1600',
+        data: data2
       }]
     });
   });
