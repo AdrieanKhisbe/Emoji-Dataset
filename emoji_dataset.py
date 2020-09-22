@@ -64,7 +64,7 @@ def main():
 
     print(f"Saving {len(dataset)} emoji entries")
     with open("dataset/dataset.json", "w") as file:
-        json.dump(dataset, file)
+        json.dump(dataset, file, indent=2)
 
 
 if __name__ == "__main__":
