@@ -1,7 +1,7 @@
 
 TODO
 - [x] Add readme
-- add gitignore
+- [x] add gitignore
 - add poetry
 - regenerate script (attention apple change)
 - docs folder
