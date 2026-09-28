@@ -19,57 +19,12 @@ git clone https://github.com/AdrieanKhisbe/Emoji-Dataset.git
 cd Emoji-Dataset
 ```
 
-Reading the dataset requires no Python dependencies. The JSON examples below use
-`jq`; you can also read `dataset/dataset.json` with your preferred JSON library.
+Reading the dataset requires no Python dependencies. You can read
+`dataset/dataset.json` with your preferred JSON library.
 
 ## Usage
 
-Run these examples from the repository root.
-
-### Get an image path
-
-For example, use the Apple rocket image in a tool that accepts a local image:
-
-```sh
-printf '%s\n' "$PWD/dataset/images/apple/rocket.png"
-```
-
-To look up a repository-relative path by its dataset name:
-
-```sh
-jq -er --arg name 'rocket' \
-  '.[] | select(.name == $name) | .apple_emoji.image_path // empty' \
-  dataset/dataset.json
-```
-
-Names such as `rocket` and `grinning face` are dataset names, not shortcodes.
-Quote paths when passing them to another command: many filenames contain spaces.
-
-### Get a data URL
-
-```sh
-jq -er --arg name 'rocket' \
-  '.[] | select(.name == $name) | .apple_emoji.data_uri // empty' \
-  dataset/dataset.json
-```
-
-This prints the stored data URL, suitable for consumers that accept inline images.
-
-### Choose a vendor
-
-The image directories use these identifiers:
-
-`apple`, `emojione`, `facebook`, `google`, `samsung`, `twitter`, `windows`.
-
-In the JSON, vendor records are named `<vendor>_emoji`, such as `apple_emoji`.
-Each contains `image_path` and `data_uri`. An emoji record also has a `name`, a
-`unicode` array of code points, and an `index` from the source chart. The chart
-index is not a stable emoji identifier; use the Unicode sequence for identity.
-
-Coverage varies by vendor, and a file on disk may have no corresponding vendor
-record in the JSON. The existing collection also contains incorrectly labelled
-vendor images and non-PNG data stored with `.png` filenames. Check the actual
-image format and artwork before relying on a particular asset.
+:construction: À être défini.
 
 ## Dataset maintenance
 
