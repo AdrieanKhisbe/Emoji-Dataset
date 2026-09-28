@@ -1,0 +1,12 @@
+[project]
+name = "emoji-dataset"
+description = "Emoji artwork and a Unicode index for terminal tools."
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.32,<3.0",
+    "beautifulsoup4>=4.13,<5.0",
+]
+
+[tool.poetry]
+package-mode = false
+requires-poetry = ">=2.0"

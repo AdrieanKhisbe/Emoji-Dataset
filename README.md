@@ -39,6 +39,18 @@ planned CLI, installation, skin-tone options, and refresh behavior.
 
 ## Contributing
 
+For Python development, use Python 3.11+ and [Poetry 2+](https://python-poetry.org/docs/#installation).
+Install the locked dependencies from the repository root:
+
+```sh
+poetry install
+poetry check --lock
+```
+
+Poetry manages dependencies only for now; the project is not yet an installable
+CLI package. Commit `poetry.lock` when changing dependencies. The legacy generator
+still needs the source update described above before it can safely refresh images.
+
 Bug reports and suggestions belong in
 [GitHub Issues](https://github.com/AdrieanKhisbe/Emoji-Dataset/issues).
 For an image problem, include the emoji, vendor, and affected path.
