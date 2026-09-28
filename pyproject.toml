@@ -9,4 +9,11 @@ dependencies = [
 
 [tool.poetry]
 package-mode = false
+
+[tool.poetry.group.dev.dependencies]
+poethepoet = "^0.48.0"
 requires-poetry = ">=2.0"
+
+[tool.poe.tasks.regenerate]
+cmd = "python emoji_dataset.py"
+help = "Regenerate the dataset with the legacy scraper (overwrites existing files)."

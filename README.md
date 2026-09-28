@@ -33,6 +33,9 @@ Python 3, `requests`, and `beautifulsoup4`, and writes directly to `dataset/`.
 Its fixed vendor-column positions no longer match the Unicode chart. Running it
 against the current chart can overwrite images with artwork from the wrong source.
 
+The task `poetry run poe regenerate` invokes this generator. Preview the command
+without running it with `poetry run poe --dry-run regenerate`.
+
 The replacement workflow will keep Unicode as the index and retrieve vendor
 artwork separately. See the [intended change](docs/intended-change.md) for the
 planned CLI, installation, skin-tone options, and refresh behavior.
