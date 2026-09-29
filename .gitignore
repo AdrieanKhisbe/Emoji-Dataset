@@ -25,5 +25,9 @@ __pycache__/
 .coverage
 .coverage.*
 htmlcov/
+/.cache/emoji-dataset/
+/.dataset-refresh.lock
+/.dataset-refresh-*/
+/.dataset-previous/
 
 # Dataset images, JSON, and dependency lockfiles remain versioned.

@@ -1,6 +1,6 @@
 # Intended change
 
-Status: design ready for final confirmation. Literal-emoji fallback remains tentative. Implementation has not started.
+Status: repository setup and vendor regeneration implemented. CLI and installation work remain pending. Literal-emoji fallback remains tentative.
 
 ## Settled intent
 
@@ -14,7 +14,7 @@ Status: design ready for final confirmation. Literal-emoji fallback remains tent
 - Retain the vendor identifiers apple, emojione, facebook, google, samsung, twitter, and windows.
 - Default to Apple, allow configuration of the default vendor, and report missing artwork as an error without automatic vendor substitution.
 - Defer fzf selection and image previews.
-- Keep existing image paths stable. Simplify JSON and generate data URLs from PNGs on demand if no existing consumer depends on the JSON structure.
+- Keep existing image paths stable. Legacy collisions where two emojis share a path require a Unicode-suffixed path for the second image. Simplify JSON and generate data URLs from PNGs on demand if no existing consumer depends on the JSON structure.
 - Select the latest available artwork for each vendor at refresh time and record the source and release used. CLI lookups use the packaged images.
 - Cover all fully qualified Unicode emoji sequences, including skin tones, gender variants, flags, and joined sequences, even where vendor artwork is unavailable.
 - Refresh each vendor atomically: validate downloads before replacing its artwork; retain its previous images if the refresh fails. Successful vendors can update independently.
@@ -31,7 +31,7 @@ Status: design ready for final confirmation. Literal-emoji fallback remains tent
 ## Final confirmation
 
 - Literal-emoji input is tentatively included as an optional fallback for emojis without GitHub aliases. The user expressed reservations; it is not a requirement for ordinary shortcode lookup.
-- Confirm the consolidated design before implementation.
+- Implementation proceeds one TODO step at a time, as authorized by the user.
 
 ## Implementation checks
 
