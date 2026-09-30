@@ -14,8 +14,8 @@ Status: repository setup and vendor regeneration implemented. CLI and installati
 - Retain the vendor identifiers apple, emojione, facebook, google, samsung, twitter, and windows.
 - Default to Apple, allow configuration of the default vendor, and report missing artwork as an error without automatic vendor substitution.
 - Defer fzf selection and image previews.
-- Keep existing image paths stable. Legacy collisions where two emojis share a path require a Unicode-suffixed path for the second image. Simplify JSON and generate data URLs from PNGs on demand if no existing consumer depends on the JSON structure.
-- Select the latest available artwork for each vendor at refresh time and record the source and release used. CLI lookups use the packaged images.
+- Keep existing image paths stable. Legacy collisions where two emojis share a path require a Unicode-suffixed path for the second image. Store the common Unicode index in `dataset.json` and artwork records in `vendors/<vendor>.json`, joined by full Unicode sequence. Each vendor record contains `unicode`, `image_path`, per-image `source` metadata, and a PNG preview `data_uri` fitted within 72×72 pixels without palette reduction or upscaling. Keep each generated JSON below 100,000,000 bytes. CLI data URLs can still be generated on demand from original PNGs.
+- Select the latest available artwork for each vendor at refresh time recording per-image source metadata in vendor files. CLI lookups use the packaged images.
 - Cover all fully qualified Unicode emoji sequences, including skin tones, gender variants, flags, and joined sequences, even where vendor artwork is unavailable.
 - Refresh each vendor atomically: validate downloads before replacing its artwork; retain its previous images if the refresh fails. Successful vendors can update independently.
 - Provide `emoji get SHORTCODE`, `--vendor VENDOR`, `--format data-url`, and the shortcut `--data-url`, plus `emoji list`.
@@ -25,7 +25,7 @@ Status: repository setup and vendor regeneration implemented. CLI and installati
 - Preserve downloaded PNG dimensions and transparency.
 - Select skin tone with an optional per-command flag; persistent skin-tone configuration is deferred.
 - Accept `--skin-tone light|medium-light|medium|medium-dark|dark`. Omission selects the unmodified emoji; unsupported combinations return an error. Apply the same tone to everyone in supported multi-person combinations; mixed-tone selection is deferred.
-- Preserve an emoji's previous vendor artwork when the newly selected release genuinely lacks it. Per-image provenance must distinguish retained artwork from refreshed artwork.
+- Preserve an emoji's previous vendor artwork when the newly selected release genuinely lacks it. Keep per-image `source` metadata in vendor files, consistent with ADR 0001. Preserve existing provenance for retained artwork; mark unknown legacy provenance with null release/URL and `verified: false`.
 - Map `emojione` to JoyPixels, `google` to classic flat Noto Color Emoji, `twitter` to Twitter/X artwork, and `windows` to Windows 2D artwork. Select the latest release within each design family; use the latest Apple, Facebook, and Samsung releases for the other identifiers.
 
 ## Final confirmation
@@ -37,7 +37,8 @@ Status: repository setup and vendor regeneration implemented. CLI and installati
 
 - Check existing JSON consumers before simplifying its structure; preserve compatibility where needed.
 - Validate actual PNG contents before accepting vendor downloads; a filename extension alone is insufficient.
-- Retained legacy images with unverified origins must not be attributed to a newly downloaded vendor release.
+- Vendor image records include `source`: vendor, release, URL, original-image SHA-256, and UTC retrieval timestamp for refreshed artwork. Cached downloads use the current refresh timestamp; do not invent historical provenance for legacy artwork.
+- Repacking local JSON must work offline, preserve original PNG bytes, and retain transactional publication. Subsequent vendor refreshes must read and write the split format.
 
 ## Findings relevant to preservation
 

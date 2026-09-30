@@ -15,7 +15,7 @@ requires-poetry = ">=2.0"
 poethepoet = "^0.48.0"
 
 [tool.poe.tasks.regenerate]
-cmd = "python emoji_dataset.py"
+cmd = "python generate_emoji_dataset.py"
 help = "Refresh the Unicode index and vendor artwork from Emojipedia."
 
 [tool.poe.tasks.test]

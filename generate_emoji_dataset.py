@@ -5,6 +5,7 @@ import base64
 import copy
 import fcntl
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -15,8 +16,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
+from PIL import Image
 
 from emoji_sources import HttpClient, UNICODE_URL, VENDORS, read_unicode_index, sequence_key, validate_png, vendor_catalog
+
+MAX_JSON_BYTES = 100_000_000
+
+
+def thumbnail_data_uri(data):
+    """Encode a PNG preview without changing the original artwork."""
+    with Image.open(io.BytesIO(data)) as original:
+        preview = original.convert("RGBA")
+        preview.thumbnail((72, 72), Image.Resampling.LANCZOS)
+        buffer = io.BytesIO()
+        preview.save(buffer, format="PNG", optimize=True)
+    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
 
 
 def load_entries(output):
@@ -29,7 +43,71 @@ def load_entries(output):
     keys = [sequence_key(entry["unicode"]) for entry in entries]
     if len(keys) != len(set(keys)):
         raise ValueError("Existing dataset contains duplicate Unicode sequences")
+    by_key = dict(zip(keys, entries))
+    for entry in entries:
+        for vendor in VENDORS:
+            # Legacy embedded URLs contain full-size artwork; rebuild previews.
+            if f"{vendor}_emoji" in entry:
+                entry[f"{vendor}_emoji"].pop("data_uri", None)
+    for vendor in VENDORS:
+        vendor_path = output / "vendors" / f"{vendor}.json"
+        if not vendor_path.exists():
+            continue
+        records = json.loads(vendor_path.read_text())
+        if not isinstance(records, list):
+            raise ValueError(f"{vendor_path} must be an array")
+        seen = set()
+        for record in records:
+            key = sequence_key(record["unicode"])
+            if key not in by_key or key in seen or f"{vendor}_emoji" in by_key[key]:
+                raise ValueError(f"Unknown or duplicate Unicode sequence in {vendor_path}")
+            seen.add(key)
+            by_key[key][f"{vendor}_emoji"] = {k: v for k, v in record.items() if k != "unicode"}
     return entries
+
+
+def write_dataset(staged, entries):
+    """Write a shared Unicode index and one artwork array per vendor."""
+    fields = {f"{vendor}_emoji" for vendor in VENDORS}
+    index = [{k: v for k, v in entry.items() if k not in fields} for entry in entries]
+    files = {staged / "dataset.json": index}
+    (staged / "vendors").mkdir(exist_ok=True)
+    for vendor in VENDORS:
+        records = []
+        for entry in entries:
+            artwork = entry.get(f"{vendor}_emoji")
+            if artwork is None:
+                continue
+            if "data_uri" not in artwork:
+                relative = image_path(entry, vendor, set())
+                data = (staged / relative).read_bytes()
+                # Some indexed legacy .png files are GIFs. Preserve their bytes
+                # and render their first frame as PNG; new downloads stay PNG-only.
+                artwork["data_uri"] = thumbnail_data_uri(data)
+            source = artwork.setdefault("source", {
+                "vendor": vendor, "release": None, "url": None, "verified": False,
+            })
+            records.append({"unicode": entry["unicode"], "image_path": artwork["image_path"],
+                            "data_uri": artwork["data_uri"], "source": source})
+        files[staged / "vendors" / f"{vendor}.json"] = records
+        print(f"{vendor}: prepared {len(records)} preview records", file=sys.stderr)
+    for path, records in files.items():
+        path.write_text(json.dumps(records, indent=2) + "\n")
+        if path.stat().st_size >= MAX_JSON_BYTES:
+            raise ValueError(f"{path.name} exceeds the 100 MB JSON limit")
+
+
+def repack(output, entries):
+    """Rebuild previews and split the local dataset without HTTP requests."""
+    with tempfile.TemporaryDirectory(prefix=f".{output.name}-refresh-", dir=output.parent) as directory:
+        staged = Path(directory) / "next"
+        shutil.copytree(output, staged)
+        for entry in entries:
+            for vendor in VENDORS:
+                if f"{vendor}_emoji" in entry:
+                    entry[f"{vendor}_emoji"].pop("data_uri", None)
+        write_dataset(staged, entries)
+        publish(output, staged)
 
 
 def merge_index(previous, index):
@@ -106,7 +184,6 @@ def prepare_paths(output, staged, entries, vendor, duplicate_names):
 def refresh_vendor(output, entries, index_metadata, catalog, http, selected):
     candidate = copy.deepcopy(entries)
     duplicate_names = {name for name, count in Counter(entry["name"] for entry in candidate).items() if count > 1}
-    fetched_at = datetime.now(timezone.utc).isoformat()
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=f".{output.name}-refresh-", dir=output.parent) as directory:
         staged = Path(directory) / "next"
@@ -132,12 +209,8 @@ def refresh_vendor(output, entries, index_metadata, catalog, http, selected):
                         continue
                     entry[field] = {
                         "image_path": str(output / relative),
-                        "data_uri": "data:image/png;base64," + base64.b64encode(retained).decode(),
+                        "data_uri": thumbnail_data_uri(retained),
                     }
-                if field in entry:
-                    entry[field].setdefault("source", {
-                        "vendor": catalog.vendor, "release": None, "url": None, "verified": False,
-                    })
                 continue
             relative = paths[key]
             data = http.png(url)
@@ -146,12 +219,16 @@ def refresh_vendor(output, entries, index_metadata, catalog, http, selected):
             destination.write_bytes(data)
             entry[f"{catalog.vendor}_emoji"] = {
                 "image_path": str(output / relative),
-                "data_uri": "data:image/png;base64," + base64.b64encode(data).decode(),
-                "source": {"vendor": catalog.vendor, "release": catalog.release,
-                           "url": url, "sha256": hashlib.sha256(data).hexdigest(),
-                           "retrieved_at": fetched_at},
+                "data_uri": thumbnail_data_uri(data),
+                "source": {
+                    "vendor": catalog.vendor,
+                    "release": catalog.release,
+                    "url": url,
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                },
             }
-        (staged / "dataset.json").write_text(json.dumps(candidate, indent=2) + "\n")
+        write_dataset(staged, candidate)
         (staged / "unicode-source.json").write_text(json.dumps(index_metadata, indent=2) + "\n")
         publish(output, staged)
     return candidate
@@ -164,9 +241,12 @@ def main(argv=None):
     parser.add_argument("--cache-dir", type=Path, default=Path(".cache/emoji-dataset"))
     parser.add_argument("--request-delay", type=float, default=0.25, help="Minimum seconds between requests to the same host")
     parser.add_argument("--emoji", action="append", help="Refresh only this Unicode sequence, e.g. U+1F600 or U+1F44B-U+1F3FB")
+    parser.add_argument("--repack", action="store_true", help="Split local JSON and rebuild 72px previews without downloading")
     args = parser.parse_args(argv)
     if args.request_delay < 0:
         parser.error("--request-delay must be nonnegative")
+    if args.repack and (args.vendor or args.emoji):
+        parser.error("--repack processes all local artwork; omit --vendor and --emoji")
     errors = []
     lock = None
     try:
@@ -182,6 +262,12 @@ def main(argv=None):
         if backup.exists():
             raise OSError(f"Recovery copy exists at {backup}; restore or move it before retrying")
         previous = load_entries(args.output)
+        if args.repack:
+            if not (args.output / "dataset.json").is_file():
+                raise ValueError("--repack requires an existing dataset.json")
+            repack(args.output, previous)
+            print("Local dataset split by vendor with 72px PNG previews")
+            return 0
         selected = {sequence_key(value.replace("U+", "").replace("-", " ").split()) for value in args.emoji or []}
         with requests.Session() as session:
             session.headers["User-Agent"] = "Emoji-Dataset (https://github.com/AdrieanKhisbe/Emoji-Dataset)"

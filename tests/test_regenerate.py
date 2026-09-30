@@ -1,4 +1,6 @@
+import base64
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -10,7 +12,7 @@ from unittest.mock import patch
 import requests
 from PIL import Image
 
-import emoji_dataset
+import generate_emoji_dataset
 
 UNICODE = """# emoji-test.txt
 # Version: 17.0
@@ -51,7 +53,7 @@ class Sources:
         return self.images[f"https://em-content.zobj.net/{source}"]
 
     def get(self, url, **kwargs):
-        if url == emoji_dataset.UNICODE_URL:
+        if url == generate_emoji_dataset.UNICODE_URL:
             return response(self.unicode.encode())
         item = self.images[url]
         return item if isinstance(item, requests.Response) else response(item)
@@ -71,10 +73,87 @@ def run(output, sources, *vendors):
     with patch.object(requests.Session, "get", side_effect=sources.get), \
          patch.object(requests.Session, "post", side_effect=sources.post), \
          contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
-        return emoji_dataset.main(args)
+        return generate_emoji_dataset.main(args)
 
 
 class RegenerateTests(unittest.TestCase):
+    def test_repack_preserves_indexed_legacy_gif_and_encodes_png_preview(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "dataset"
+            image = output / "images/windows/legacy.png"
+            image.parent.mkdir(parents=True)
+            Image.new("RGBA", (12, 12), "red").save(image, format="GIF")
+            original = image.read_bytes()
+            (output / "dataset.json").write_text(json.dumps([
+                {"unicode": ["U+2194", "U+FE0F"], "name": "legacy",
+                 "windows_emoji": {"image_path": str(image)}}
+            ]))
+            with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(generate_emoji_dataset.main(["--output", str(output), "--repack"]), 0)
+            self.assertEqual(image.read_bytes(), original)
+            record = json.loads((output / "vendors/windows.json").read_text())[0]
+            data = base64.b64decode(record["data_uri"].split(",", 1)[1])
+            with Image.open(io.BytesIO(data)) as preview:
+                self.assertEqual(preview.format, "PNG")
+                self.assertEqual(preview.size, (12, 12))
+
+    def test_repack_splits_index_and_keeps_originals_with_rgba_previews(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "dataset"
+            image = output / "images/apple/example.png"
+            image.parent.mkdir(parents=True)
+            original = Image.new("RGBA", (160, 80), (0, 0, 0, 0))
+            original.paste((250, 123, 45, 255), (40, 20, 120, 60))
+            original.save(image)
+            original_bytes = image.read_bytes()
+            index = [{"unicode": ["U+1F600"], "name": "example"},
+                     {"unicode": ["U+1F44B", "U+1F3FB"], "name": "no artwork"}]
+            legacy = [dict(entry) for entry in index]
+            legacy[0]["apple_emoji"] = {"image_path": str(image), "data_uri": "old", "source": {"vendor": "apple"}}
+            (output / "dataset.json").write_text(json.dumps(legacy))
+            archive = output / "dataset-big.json"
+            archive.write_bytes(b"archive must stay identical")
+            with patch.object(requests.Session, "get") as get, patch.object(requests.Session, "post") as post:
+                self.assertEqual(generate_emoji_dataset.main(["--output", str(output), "--repack"]), 0)
+                get.assert_not_called()
+                post.assert_not_called()
+            self.assertEqual(json.loads((output / "dataset.json").read_text()), index)
+            records = json.loads((output / "vendors/apple.json").read_text())
+            self.assertEqual(len(records), 1)
+            self.assertEqual(set(records[0]), {"unicode", "image_path", "data_uri", "source"})
+            self.assertEqual(records[0]["source"], {"vendor": "apple"})
+            self.assertEqual(records[0]["unicode"], index[0]["unicode"])
+            self.assertEqual(records[0]["image_path"], str(image))
+            self.assertEqual(json.loads((output / "vendors/google.json").read_text()), [])
+            with Image.open(io.BytesIO(base64.b64decode(records[0]["data_uri"].split(",", 1)[1]))) as preview:
+                self.assertEqual(preview.size, (72, 36))
+                self.assertEqual(preview.mode, "RGBA")
+                self.assertEqual(preview.getpixel((0, 0))[3], 0)
+            self.assertEqual(image.read_bytes(), original_bytes)
+            self.assertEqual(archive.read_bytes(), b"archive must stay identical")
+            # The new layout is accepted on a later refresh; other vendors survive.
+            sources = Sources()
+            sources.vendor("noto-color-emoji", "blue")
+            apple_bytes = (output / "vendors/apple.json").read_bytes()
+            self.assertEqual(run(output, sources, "google"), 0)
+            self.assertEqual((output / "vendors/apple.json").read_bytes(), apple_bytes)
+            self.assertEqual(image.read_bytes(), original_bytes)
+
+    def test_oversized_vendor_json_aborts_publication(self):
+        sources = Sources()
+        sources.vendor("apple", "red")
+        gradient = io.BytesIO()
+        Image.linear_gradient("L").convert("RGBA").save(gradient, format="PNG")
+        sources.images[next(iter(sources.images))] = gradient.getvalue()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "dataset"
+            output.mkdir()
+            (output / "dataset.json").write_text("[]\n")
+            with patch.object(generate_emoji_dataset, "MAX_JSON_BYTES", 350):
+                self.assertEqual(run(output, sources, "apple"), 1)
+            self.assertEqual((output / "dataset.json").read_text(), "[]\n")
+            self.assertEqual(list(output.iterdir()), [output / "dataset.json"])
+
     def test_legacy_shared_path_is_split_without_overwriting_retained_artwork(self):
         sources = Sources()
         sources.vendor("apple", "red")
@@ -94,7 +173,7 @@ class RegenerateTests(unittest.TestCase):
                 for code in ["0023", "002A"]
             ]))
             self.assertEqual(run(output, sources, "apple"), 0)
-            entries = json.loads((output / "dataset.json").read_text())
+            entries = generate_emoji_dataset.load_entries(output)
             paths = [Path(entry["apple_emoji"]["image_path"]) for entry in entries]
             self.assertEqual(paths[0], shared)
             self.assertNotEqual(paths[0], paths[1])
@@ -105,7 +184,7 @@ class RegenerateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "dataset"
             with patch.object(requests.Session, "get") as get, contextlib.redirect_stderr(io.StringIO()):
-                status = emoji_dataset.main(["--output", str(output), "--cache-dir", str(output / "cache")])
+                status = generate_emoji_dataset.main(["--output", str(output), "--cache-dir", str(output / "cache")])
             self.assertEqual(status, 1)
             get.assert_not_called()
             self.assertFalse(output.exists())
@@ -117,7 +196,7 @@ class RegenerateTests(unittest.TestCase):
             with patch.object(requests.Session, "get", side_effect=sources.get), \
                  patch.object(requests.Session, "post", return_value=response(b"limited", 429, {"Retry-After": "60"})) as post, \
                  contextlib.redirect_stderr(io.StringIO()) as stderr:
-                status = emoji_dataset.main(["--output", str(output), "--request-delay", "0"])
+                status = generate_emoji_dataset.main(["--output", str(output), "--request-delay", "0"])
             self.assertEqual(status, 1)
             self.assertEqual(post.call_count, 1)
             self.assertIn("Retry-After: 60", stderr.getvalue())
@@ -175,14 +254,20 @@ class RegenerateTests(unittest.TestCase):
         sources = Sources()
         mapping = {"apple": "apple", "emojione": "joypixels", "facebook": "facebook",
                    "google": "noto-color-emoji", "samsung": "samsung", "twitter": "twitter", "windows": "microsoft"}
-        for slug in mapping.values():
-            sources.vendor(slug, "red")
+        expected = {}
+        for (vendor, slug), color in zip(mapping.items(), ["red", "blue", "green", "yellow", "purple", "black", "white"]):
+            expected[vendor] = sources.vendor(slug, color)
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "dataset"
             self.assertEqual(run(output, sources), 0)
-            entry = json.loads((output / "dataset.json").read_text())[0]
+            entry = generate_emoji_dataset.load_entries(output)[0]
             for vendor, slug in mapping.items():
-                self.assertIn(f"/source/{slug}/", entry[f"{vendor}_emoji"]["source"]["url"])
+                record = entry[f"{vendor}_emoji"]
+                self.assertEqual(Path(record["image_path"]).read_bytes(), expected[vendor])
+                self.assertEqual(record["source"]["vendor"], vendor)
+                self.assertEqual(record["source"]["release"], "v1")
+                self.assertEqual(record["source"]["sha256"], hashlib.sha256(expected[vendor]).hexdigest())
+                self.assertIn("retrieved_at", record["source"])
 
     def test_late_invalid_download_rolls_back_vendor_and_keeps_other_vendor_progress(self):
         sources = Sources()
@@ -205,8 +290,8 @@ class RegenerateTests(unittest.TestCase):
             ]))
             self.assertEqual(run(output, sources, "apple", "google"), 1)
             self.assertEqual(old_path.read_bytes(), old)
-            entries = json.loads((output / "dataset.json").read_text())
-            self.assertEqual(entries[0]["apple_emoji"]["source"]["release"], "old")
+            entries = generate_emoji_dataset.load_entries(output)
+            self.assertEqual(entries[0]["apple_emoji"]["source"], {"release": "old"})
             self.assertEqual(Path(entries[0]["google_emoji"]["image_path"]).read_bytes(), google)
             self.assertEqual(list((output / "images/apple").iterdir()), [old_path])
 
@@ -228,7 +313,7 @@ class RegenerateTests(unittest.TestCase):
                 {"unicode": ["U+1F44B", "U+1F3FB"], "name": "old toned name", "apple_emoji": {"image_path": str(old)}}
             ]))
             self.assertEqual(run(output, sources, "apple"), 0)
-            entries = json.loads((output / "dataset.json").read_text())
+            entries = generate_emoji_dataset.load_entries(output)
             self.assertEqual(entries[1]["apple_emoji"]["image_path"], str(old))
             self.assertEqual(old.read_bytes(), expected)
 
@@ -270,12 +355,12 @@ class RegenerateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "dataset"
             self.assertEqual(run(output, sources, "apple"), 0)
-            entries = json.loads((output / "dataset.json").read_text())
+            entries = generate_emoji_dataset.load_entries(output)
             paths = [Path(e["apple_emoji"]["image_path"]) for e in entries]
             self.assertNotEqual(paths[0], paths[1])
             self.assertEqual([path.read_bytes() for path in paths], expected)
 
-    def test_missing_new_artwork_preserves_legacy_file_and_marks_unknown_provenance(self):
+    def test_missing_new_artwork_preserves_legacy_file_with_unverified_source(self):
         sources = Sources()
         sources.vendor("apple", "red")
         with tempfile.TemporaryDirectory() as directory:
@@ -286,27 +371,25 @@ class RegenerateTests(unittest.TestCase):
             legacy.write_bytes(old_image)
             (output / "dataset.json").write_text("[]")
             self.assertEqual(run(output, sources, "apple"), 0)
-            entries = json.loads((output / "dataset.json").read_text())
+            entries = generate_emoji_dataset.load_entries(output)
             retained = entries[1]["apple_emoji"]
             self.assertEqual(Path(retained["image_path"]).read_bytes(), old_image)
-            self.assertIsNone(retained["source"]["release"])
-            self.assertIsNone(retained["source"]["url"])
-            self.assertFalse(retained["source"]["verified"])
+            self.assertEqual(retained["source"], {"vendor": "apple", "release": None, "url": None, "verified": False})
 
-    def test_unicode_index_uses_selected_vendor_artwork_and_release(self):
+    def test_unicode_index_uses_selected_vendor_artwork_with_source_metadata(self):
         sources = Sources()
         apple = sources.vendor("apple", "red")
         google = sources.vendor("noto-color-emoji", "blue")
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "dataset"
             self.assertEqual(run(output, sources, "apple", "google"), 0)
-            entries = json.loads((output / "dataset.json").read_text())
+            entries = generate_emoji_dataset.load_entries(output)
             self.assertEqual([item["unicode"] for item in entries], [["U+1F600"], ["U+1F44B", "U+1F3FB"]])
             for vendor, expected in [("apple", apple), ("google", google)]:
                 image = entries[0][f"{vendor}_emoji"]
                 self.assertEqual(Path(image["image_path"]).read_bytes(), expected)
-                self.assertEqual(image["source"]["release"], "v1")
-                self.assertIn(f"/source/{'apple' if vendor == 'apple' else 'noto-color-emoji'}/", image["source"]["url"])
+                self.assertEqual(image["source"]["vendor"], vendor)
+                self.assertEqual(image["source"]["sha256"], hashlib.sha256(expected).hexdigest())
 
     def test_unexpected_unicode_response_does_not_replace_existing_index(self):
         response = requests.Response()
@@ -319,7 +402,7 @@ class RegenerateTests(unittest.TestCase):
             index.write_text("[]\n")
             with patch.object(requests.Session, "get", return_value=response):
                 with contextlib.redirect_stderr(io.StringIO()):
-                    status = emoji_dataset.main(["--output", str(output), "--vendor", "apple"])
+                    status = generate_emoji_dataset.main(["--output", str(output), "--vendor", "apple"])
             self.assertEqual(status, 1)
             self.assertEqual(index.read_text(), "[]\n")
 
@@ -331,7 +414,7 @@ class RegenerateTests(unittest.TestCase):
             index.write_text("[]\n")
             with patch.object(requests.Session, "get", side_effect=requests.ConnectionError("offline")):
                 with contextlib.redirect_stderr(io.StringIO()):
-                    status = emoji_dataset.main(["--output", str(output), "--vendor", "apple"])
+                    status = generate_emoji_dataset.main(["--output", str(output), "--vendor", "apple"])
             self.assertEqual(status, 1)
             self.assertEqual(index.read_text(), "[]\n")
             self.assertEqual(list(output.iterdir()), [index])
