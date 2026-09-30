@@ -28,7 +28,7 @@ Reading the dataset requires no Python dependencies. You can read
 
 ## Dataset maintenance
 
-[`generate_emoji_dataset.py`](generate_emoji_dataset.py) reads Unicode's fully qualified emoji index
+[`src/generate_emoji_dataset.py`](src/generate_emoji_dataset.py) reads Unicode's fully qualified emoji index
 and downloads the latest released vendor artwork from Emojipedia. Each PNG is
 validated before publication. `resources/dataset/dataset.json` contains the shared Unicode
 index. Each `resources/dataset/vendors/<vendor>.json` contains an array of image records
@@ -89,6 +89,9 @@ Install the locked dependencies from the repository root:
 poetry install
 poetry check --lock
 ```
+
+Tests use pytest with temporary datasets and simulated HTTP sources. Run them
+with `poetry run poe test`. Python source modules live in `src/`.
 
 Poetry manages dependencies only for now; the project is not yet an installable
 CLI package. Commit `poetry.lock` when changing dependencies.

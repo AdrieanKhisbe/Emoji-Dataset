@@ -1,5 +1,7 @@
 # Intended change
 
+The CLI decisions below are historical where they conflict with the ongoing [CLI specification](cli-spec.md), developed from the revised TODO draft. Dataset regeneration decisions remain applicable.
+
 Status: repository setup and vendor regeneration implemented. CLI and installation work remain pending. Literal-emoji fallback remains tentative.
 
 ## Settled intent

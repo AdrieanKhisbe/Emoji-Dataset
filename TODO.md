@@ -12,6 +12,9 @@ Things to do in the repo reforge
 - [ ] implement the cli
 - [ ] review docs folder and README
 - [ ] Update the name
+- [ ] See the licence
+- [ ] Check the packaging
+- [ ] Brew formula
 
 
 ------
@@ -25,8 +28,6 @@ Liens
 
 
 ### Proto spec for cli
-data uri à la volée avec taille spécifiée (calcul on the fly sauf si taille sauvegarde)
-téléchargement fichier à la demande. charset inclu
 
 The cli should do two main things:
 - manage the installation of the resources `emoji install [--vendor apple]`
@@ -49,6 +50,6 @@ Notes:
 - utilise des emojis pour décorer les messages et prompts
 
 Extra:
-- une option `--size` pourrait etre introduit dans un second temps pour les dataurls
+- une option `--size` pourrait etre introduit dans un second temps pour les dataurls. avec encodage à la volée
 - ptetre que dans un second temps des customs emoji seront supportée
 - possibilité de supprimer un vendor

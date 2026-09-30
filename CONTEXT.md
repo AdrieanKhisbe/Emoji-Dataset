@@ -26,3 +26,12 @@ A textual alias used to select an emoji from the command line, independently of 
 
 **Skin tone**:
 A variation of a supported human emoji selected independently of its base shortcode. Some multi-person emojis support more than one skin tone in a single sequence.
+
+**Default vendor**:
+The installed vendor selected when no vendor override is supplied. Initially, it is the first vendor successfully installed.
+
+**Default skin tone**:
+A saved preference applied to emojis that support skin-tone variations when no per-request tone is supplied.
+
+**Artwork preview**:
+A smaller rendering of vendor artwork, distinct from its original image. It depicts the same emoji and vendor design.

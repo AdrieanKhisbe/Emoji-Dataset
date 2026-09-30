@@ -27,7 +27,7 @@ RELEASE_QUERY = """query VendorReleases($slug: Slug!, $lang: Language) {
 IMAGE_QUERY = """query VendorImages($slug: Slug!, $version: Slug!, $lang: Language) {
   vendorHistoricEmoji_v1(slug: $slug, version: $version, lang: $lang) {
     items { images { slug image { source } status } }
-    statuses
+    statuses^
   }
 }"""
 
