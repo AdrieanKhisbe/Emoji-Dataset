@@ -31,3 +31,8 @@ htmlcov/
 /.dataset-previous/
 
 # Dataset images, JSON, and dependency lockfiles remain versioned.
+
+# Staging and recovery files beside the default dataset directory
+/resources/.dataset-refresh.lock
+/resources/.dataset-refresh-*/
+/resources/.dataset-previous/

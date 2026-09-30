@@ -20,7 +20,7 @@ cd Emoji-Dataset
 ```
 
 Reading the dataset requires no Python dependencies. You can read
-`dataset/dataset.json` with your preferred JSON library.
+`resources/dataset/dataset.json` with your preferred JSON library.
 
 ## Usage
 
@@ -30,8 +30,8 @@ Reading the dataset requires no Python dependencies. You can read
 
 [`generate_emoji_dataset.py`](generate_emoji_dataset.py) reads Unicode's fully qualified emoji index
 and downloads the latest released vendor artwork from Emojipedia. Each PNG is
-validated before publication. `dataset/dataset.json` contains the shared Unicode
-index. Each `dataset/vendors/<vendor>.json` contains an array of image records
+validated before publication. `resources/dataset/dataset.json` contains the shared Unicode
+index. Each `resources/dataset/vendors/<vendor>.json` contains an array of image records
 with `unicode`, `image_path`, `data_uri`, and `source`; join records to the index by their
 full `unicode` sequence. Missing artwork has no vendor record.
 
@@ -73,7 +73,7 @@ retrying. The public website endpoint currently requires no authentication.
 It is not a stable public API; source-format changes cause the refresh to fail.
 
 Publication uses a staged directory and rollback, with a lock against concurrent
-generators. If interrupted during publication, a sibling `.dataset-previous`
+generators. If interrupted during publication, a sibling `resources/.dataset-previous`
 recovery copy may remain (named after `--output`). Inspect and restore or move it
 before retrying. Keep `--output` dedicated to the dataset and the cache outside it.
 

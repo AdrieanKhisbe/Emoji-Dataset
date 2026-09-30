@@ -236,7 +236,7 @@ def refresh_vendor(output, entries, index_metadata, catalog, http, selected):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=Path("dataset"))
+    parser.add_argument("--output", type=Path, default=Path("resources/dataset"))
     parser.add_argument("--vendor", action="append", choices=VENDORS, help="Refresh only this vendor; repeat to select several")
     parser.add_argument("--cache-dir", type=Path, default=Path(".cache/emoji-dataset"))
     parser.add_argument("--request-delay", type=float, default=0.25, help="Minimum seconds between requests to the same host")
