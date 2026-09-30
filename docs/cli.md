@@ -3,9 +3,9 @@
 Install the program with Python 3.11+ through either tool:
 
 ```sh
-uv tool install git+https://github.com/AdrieanKhisbe/Emoji-Dataset.git
+uv tool install git+https://github.com/AdrieanKhisbe/emoji-toolkit.git
 # or
-pipx install git+https://github.com/AdrieanKhisbe/Emoji-Dataset.git
+pipx install git+https://github.com/AdrieanKhisbe/emoji-toolkit.git
 ```
 
 Until this branch is merged, append `@regeneration` to the Git URL.
@@ -27,6 +27,7 @@ an installed vendor. `--local-override` cannot be combined with `--release`.
 emoji install --vendor apple
 emoji grinning                         # absolute original PNG path
 emoji :grinning: --url                  # PNG preview data URL, at most 72×72
+emoji --url grinning                    # options may precede the shortcode
 emoji grinning --data-url               # alias for --url
 emoji grinning --url-file               # path to a file containing the URL
 emoji wave --skin-tone dark

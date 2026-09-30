@@ -67,11 +67,15 @@ class EmojiGroup(click.Group):
         # GitHub's thumbs-down alias is a positional value, not a short option.
         if args and args[0] == "-1":
             args = [":-1:", *args[1:]]
+        lookup_options = {option for param in lookup.params if isinstance(param, click.Option) for option in param.opts}
+        if args and args[0].split("=", 1)[0] in lookup_options:
+            # Leave lookup options for the lookup command's own Click parser.
+            args = ["--", *args]
         return super().parse_args(ctx, args)
 
     def resolve_command(self, ctx, args):
         if args and args[0] not in self.commands:
-            return "lookup", lookup, args
+            return "lookup", lookup, [":-1:" if arg == "-1" else arg for arg in args]
         return super().resolve_command(ctx, args)
 
 

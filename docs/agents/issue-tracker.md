@@ -1,8 +1,8 @@
 # Issue tracker: GitHub
 
 Issues and specs live in GitHub Issues for
-AdrieanKhisbe/Emoji-Dataset. Use the gh CLI from this clone,
-or pass --repo AdrieanKhisbe/Emoji-Dataset explicitly.
+AdrieanKhisbe/emoji-toolkit. Use the gh CLI from this clone,
+or pass --repo AdrieanKhisbe/emoji-toolkit explicitly.
 
 ## Operations
 

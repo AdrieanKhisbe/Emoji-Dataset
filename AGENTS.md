@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Use GitHub Issues in AdrieanKhisbe/Emoji-Dataset.
+Use GitHub Issues in AdrieanKhisbe/emoji-toolkit.
 See `docs/agents/issue-tracker.md`.
 
 ### Triage labels

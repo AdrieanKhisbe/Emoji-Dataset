@@ -86,7 +86,7 @@ def releases(monkeypatch):
     def publish(folder):
         assets = []
         for path in folder.iterdir():
-            url = f"https://github.com/AdrieanKhisbe/Emoji-Dataset/releases/download/{folder.name}/{path.name}"
+            url = f"https://github.com/AdrieanKhisbe/emoji-toolkit/releases/download/{folder.name}/{path.name}"
             data = path.read_bytes()
             responses[url] = data
             assets.append({"name": path.name, "browser_download_url": url, "digest": "sha256:" + hashlib.sha256(data).hexdigest()})
@@ -477,6 +477,9 @@ def test_bare_negative_shortcode_matches_colon_form(resources, tmp_path, termina
     bare = invoke(terminal, "-1")
     assert bare.exit_code == 0, bare.output
     assert bare.stdout == invoke(terminal, ":-1:").stdout
+    before = invoke(terminal, "--url", "-1")
+    assert before.exit_code == 0, before.output
+    assert before.stdout == invoke(terminal, ":-1:", "--url").stdout
 
 
 def test_backup_cleanup_failure_reports_success_and_allows_later_update(resources, tmp_path, terminal, releases, monkeypatch):
@@ -601,3 +604,17 @@ def test_local_source_keeps_successful_vendors_after_failure(resources, terminal
     assert result.exit_code != 0
     assert "google:" in invoke(terminal, "status").stdout
     assert Path(invoke(terminal, "grinning").stdout.strip()).read_bytes() == png("blue")
+
+
+@pytest.mark.parametrize('options', [
+    ['--url'], ['--data-url'], ['--url-file'],
+    ['--vendor', 'apple', '--url'], ['--vendor=apple', '--url'],
+    ['--skin-tone', 'dark', '--url'],
+])
+def test_lookup_options_work_before_or_after_shortcode(resources, terminal, options):
+    dataset, aliases = resources
+    assert invoke(terminal, 'install', '--vendor', 'apple', '--local-override', str(dataset), '--aliases', str(aliases)).exit_code == 0
+    before = invoke(terminal, *options, 'wave')
+    after = invoke(terminal, 'wave', *options)
+    assert before.exit_code == after.exit_code == 0, before.output
+    assert before.stdout == after.stdout

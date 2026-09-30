@@ -1,7 +1,7 @@
 [project]
-name = "emoji-dataset"
+name = "emoji"
 version = "0.1.0"
-description = "Emoji artwork and a Unicode index for terminal tools."
+description = "Get emoji images or data URLs from your terminal for notifications, scripts, and everyday tools."
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.32,<3.0",
@@ -11,7 +11,6 @@ dependencies = [
 
 [project.scripts]
 emoji = "emoji_dataset.cli:cli"
-emoji-build-bundles = "emoji_dataset.bundles:cli"
 
 [build-system]
 requires = ["poetry-core>=2.0,<3.0"]
@@ -35,8 +34,8 @@ check_untyped_defs = true
 cmd = "python -m mypy"
 help = "Check CLI and bundle builder types."
 
-[tool.poe.tasks.bundles]
-cmd = "emoji-build-bundles"
+[tool.poe.tasks.build-bundles]
+cmd = "python -m emoji_dataset.bundles"
 help = "Build vendor resource archives for a manual GitHub release."
 
 [tool.poe.tasks.local-install]

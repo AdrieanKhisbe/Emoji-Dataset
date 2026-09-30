@@ -1,10 +1,10 @@
-# Emoji Dataset
+# Emoji Toolkit
 
-> Emoji artwork for your terminal scripts, notifications, and other little tools. :rocket:
+> Get emoji images or data URLs from your terminal for notifications, scripts, and everyday tools.
 
 ## About
 
-Emoji Dataset collects emoji images by vendor, alongside a JSON index of Unicode
+Emoji Toolkit collects emoji images by vendor, alongside a JSON index of Unicode
 sequences, names, image paths, and data URLs.
 
 The repository provides a Unicode dataset, a vendor artwork generator, and the
@@ -15,8 +15,8 @@ The repository provides a Unicode dataset, a vendor artwork generator, and the
 Install the CLI with Python 3.11+:
 
 ```sh
-uv tool install git+https://github.com/AdrieanKhisbe/Emoji-Dataset.git
-# or: pipx install git+https://github.com/AdrieanKhisbe/Emoji-Dataset.git
+uv tool install git+https://github.com/AdrieanKhisbe/emoji-toolkit.git
+# or: pipx install git+https://github.com/AdrieanKhisbe/emoji-toolkit.git
 ```
 
 Install artwork separately with `emoji install --vendor apple` once a compatible
@@ -25,8 +25,8 @@ resource release is published. See [CLI usage](docs/cli.md).
 Or clone the repository to use the checked-in images and JSON locally:
 
 ```sh
-git clone https://github.com/AdrieanKhisbe/Emoji-Dataset.git
-cd Emoji-Dataset
+git clone https://github.com/AdrieanKhisbe/emoji-toolkit.git
+cd emoji-toolkit
 ```
 
 Reading the dataset requires no Python dependencies. You can read
@@ -114,7 +114,7 @@ Run `poetry run poe typecheck` for CLI type checks and `poetry build` for the
 installable package. Commit `poetry.lock` when changing dependencies.
 
 Bug reports and suggestions belong in
-[GitHub Issues](https://github.com/AdrieanKhisbe/Emoji-Dataset/issues).
+[GitHub Issues](https://github.com/AdrieanKhisbe/emoji-toolkit/issues).
 For an image problem, include the emoji, vendor, and affected path.
 
 The [glossary](CONTEXT.md) defines the project's vocabulary, and

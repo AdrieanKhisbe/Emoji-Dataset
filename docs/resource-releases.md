@@ -12,7 +12,7 @@ For example, from the repository root:
 
 ```sh
 curl -L --fail https://raw.githubusercontent.com/github/gemoji/fadaeaf1f1a9be82b321316a6c5502e43138b2f6/db/emoji.json -o /tmp/gemoji.json
-poetry run poe bundles --aliases /tmp/gemoji.json \
+poetry run poe build-bundles --aliases /tmp/gemoji.json \
   --release resources-2026-09-30 --output dist/resources-2026-09-30
 ```
 

@@ -270,7 +270,7 @@ def main(argv=None):
             return 0
         selected = {sequence_key(value.replace("U+", "").replace("-", " ").split()) for value in args.emoji or []}
         with requests.Session() as session:
-            session.headers["User-Agent"] = "Emoji-Dataset (https://github.com/AdrieanKhisbe/Emoji-Dataset)"
+            session.headers["User-Agent"] = "Emoji-Dataset (https://github.com/AdrieanKhisbe/emoji-toolkit)"
             http = HttpClient(session, args.cache_dir, args.request_delay)
             response = http.request("get", UNICODE_URL)
             version, index = read_unicode_index(response.content.decode("utf-8"))

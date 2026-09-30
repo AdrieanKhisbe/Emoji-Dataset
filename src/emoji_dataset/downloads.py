@@ -10,13 +10,13 @@ import requests
 
 from .format import SCHEMA, digest
 
-RELEASES_URL = "https://api.github.com/repos/AdrieanKhisbe/Emoji-Dataset/releases"
+RELEASES_URL = "https://api.github.com/repos/AdrieanKhisbe/emoji-toolkit/releases"
 
 
 class ReleaseClient:
     def __init__(self) -> None:
         self.session = requests.Session()
-        self.session.headers["User-Agent"] = "emoji-dataset/0.1"
+        self.session.headers["User-Agent"] = "emoji/0.1"
 
     def download(self, url: str) -> bytes:
         for attempt in range(3):
