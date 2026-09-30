@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pytest
 import requests
 from PIL import Image
+from graphql import parse
 
 import generate_emoji_dataset
 
@@ -58,6 +59,7 @@ class Sources:
 
     def post(self, url, *, json, **kwargs):
         assert url == "https://emojipedia.org/api/graphql"
+        parse(json["query"])
         slug = json["variables"]["slug"]
         if json["operationName"] == "VendorReleases":
             return response({"data": {"vendorHistoric_v1": self.releases[slug]}})

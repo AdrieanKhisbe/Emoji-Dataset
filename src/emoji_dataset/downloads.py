@@ -38,7 +38,8 @@ class ReleaseClient:
                 if retry_after > 60:
                     raise ValueError(f"Server requests a {retry_after:.0f}s wait. Wait and rerun emoji install.")
                 response.raise_for_status()
-            except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as error:
+            except (requests.ConnectionError, requests.Timeout, requests.HTTPError,
+                    requests.exceptions.ChunkedEncodingError) as error:
                 if isinstance(error, requests.HTTPError):
                     status = error.response.status_code if error.response is not None else 0
                     if status != 429 and status < 500:

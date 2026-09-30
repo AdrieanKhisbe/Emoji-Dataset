@@ -25,6 +25,7 @@ poethepoet = "^0.48.0"
 pytest = "^9.1.1"
 mypy = "^1.15"
 types-requests = "^2.32"
+graphql-core = {version = ">=3.2,<3.3", python = ">=3.11,<4"}
 
 [tool.mypy]
 files = ["src/emoji_dataset"]

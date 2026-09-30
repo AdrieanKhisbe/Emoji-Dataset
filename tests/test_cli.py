@@ -285,7 +285,7 @@ def test_invalid_update_preserves_previous_vendor_and_continues_batch(resources,
     assert "google: resources-v2" in status
 
 
-@pytest.mark.parametrize("failure", ["timeout", 429, 503])
+@pytest.mark.parametrize("failure", ["timeout", "interrupted", 429, 503])
 def test_install_retries_transient_downloads(resources, tmp_path, terminal, releases, monkeypatch, failure):
     import time
     waits = []
@@ -296,6 +296,8 @@ def test_install_retries_transient_downloads(resources, tmp_path, terminal, rele
     success = releases.responses[url]
     if failure == "timeout":
         error = requests.Timeout("slow network")
+    elif failure == "interrupted":
+        error = requests.exceptions.ChunkedEncodingError("Connection broken: IncompleteRead")
     else:
         error = requests.Response()
         error.status_code = failure
@@ -308,7 +310,7 @@ def test_install_retries_transient_downloads(resources, tmp_path, terminal, rele
     assert invoke(terminal, "grinning").exit_code == 0
 
 
-@pytest.mark.parametrize("status, retry_after, attempts", [(404, None, 1), (429, "61", 1), (503, None, 3)])
+@pytest.mark.parametrize("status, retry_after, attempts", [(404, None, 1), (429, "61", 1), (503, None, 3), ("interrupted", None, 3)])
 def test_install_stops_after_permanent_error_long_wait_or_retry_budget(resources, tmp_path, terminal, releases, monkeypatch, status, retry_after, attempts):
     import time
     monkeypatch.setattr(time, "sleep", lambda _: None)
@@ -318,6 +320,8 @@ def test_install_stops_after_permanent_error_long_wait_or_retry_budget(resources
     error.status_code = status
     if retry_after:
         error.headers["Retry-After"] = retry_after
+    if status == "interrupted":
+        error = requests.exceptions.ChunkedEncodingError("Connection broken: IncompleteRead")
     replies = [error] * 4
     releases.responses[url] = replies
     result = invoke(terminal, "install", "--vendor", "apple")
