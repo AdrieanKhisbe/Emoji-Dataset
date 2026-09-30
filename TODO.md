@@ -8,7 +8,7 @@ Things to do in the repo reforge
 - [x] regenerate script (attention apple change)
 - [x] rewrite tests with pytest
 - [x] dataset in resources
-- [ ] spec the cli (install and display)
+- [x] spec the cli (install and display) — [agreed specification](docs/cli-spec.md)
 - [ ] implement the cli
 - [ ] review docs folder and README
 - [ ] Update the name
