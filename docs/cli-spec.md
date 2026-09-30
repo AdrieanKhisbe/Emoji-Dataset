@@ -33,6 +33,12 @@ This document develops the draft in TODO.md. For the CLI, it supersedes conflict
 - Validate bundles both when building and installing them. Reject corrupt images, non-PNG contents under PNG filenames, and checksum mismatches for the affected vendor, preserving its previous installation. Do not silently repair distributed artwork on users' machines.
 - Set up a GitHub Actions workflow for the test suite as part of v1.
 
+## Local testing additions
+
+- `emoji config set vendor` exposes the seven identifiers as Click choices, including help, validation, and completion. Skin-tone values also use Click choices.
+- `emoji install --local-override PATH` reads the source dataset directly; `--local-overidde` is accepted as an alias. Use the normal installer validation, vendor isolation, stable paths, and explicit `--update` rules. Do not modify source files.
+- Local installation uses `--aliases PATH` for an offline gemoji input, or downloads the pinned GitHub metadata if omitted. Mark installed versions as `local:<source path>`; this testing mode bypasses GitHub resource releases and cannot be combined with `--release`.
+
 ## Verified edge cases
 
 - The keycap name collision has been fixed: #️⃣ is `keycap number sign` and *️⃣ is `keycap asterisk`, with corresponding PNG filenames in all seven vendors. Their CLDR labels remain `keycap: #` and `keycap: *`. Installed basenames preserve these distinctions while replacing spaces with underscores.

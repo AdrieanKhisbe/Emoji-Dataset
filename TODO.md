@@ -9,7 +9,7 @@ Things to do in the repo reforge
 - [x] rewrite tests with pytest
 - [x] dataset in resources
 - [x] spec the cli (install and display) — [agreed specification](docs/cli-spec.md)
-- [ ] implement the cli
+- [x] implement the cli — [commands](docs/cli.md), [resource releases](docs/resource-releases.md)
 - [ ] review docs folder and README
 - [ ] Update the name
 - [ ] See the licence

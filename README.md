@@ -7,12 +7,22 @@
 Emoji Dataset collects emoji images by vendor, alongside a JSON index of Unicode
 sequences, names, image paths, and data URLs.
 
-The repository currently provides the dataset and a Python generator.
-A shortcode-based CLI is planned; it is not available yet.
+The repository provides a Unicode dataset, a vendor artwork generator, and the
+`emoji` command for offline shortcode lookup.
 
 ## Installation
 
-Clone the repository to use the checked-in images and JSON locally:
+Install the CLI with Python 3.11+:
+
+```sh
+uv tool install git+https://github.com/AdrieanKhisbe/Emoji-Dataset.git
+# or: pipx install git+https://github.com/AdrieanKhisbe/Emoji-Dataset.git
+```
+
+Install artwork separately with `emoji install --vendor apple` once a compatible
+resource release is published. See [CLI usage](docs/cli.md).
+
+Or clone the repository to use the checked-in images and JSON locally:
 
 ```sh
 git clone https://github.com/AdrieanKhisbe/Emoji-Dataset.git
@@ -24,7 +34,14 @@ Reading the dataset requires no Python dependencies. You can read
 
 ## Usage
 
-:construction: À être défini.
+```sh
+emoji grinning             # original PNG path
+emoji :grinning: --url      # PNG preview data URL
+emoji wave --skin-tone dark
+```
+
+See [CLI commands and configuration](docs/cli.md) and
+[manual resource releases](docs/resource-releases.md).
 
 ## Dataset maintenance
 
@@ -93,8 +110,8 @@ poetry check --lock
 Tests use pytest with temporary datasets and simulated HTTP sources. Run them
 with `poetry run poe test`. Python source modules live in `src/`.
 
-Poetry manages dependencies only for now; the project is not yet an installable
-CLI package. Commit `poetry.lock` when changing dependencies.
+Run `poetry run poe typecheck` for CLI type checks and `poetry build` for the
+installable package. Commit `poetry.lock` when changing dependencies.
 
 Bug reports and suggestions belong in
 [GitHub Issues](https://github.com/AdrieanKhisbe/Emoji-Dataset/issues).
