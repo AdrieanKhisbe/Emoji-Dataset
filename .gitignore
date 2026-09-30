@@ -7,6 +7,10 @@ Thumbs.db
 *.swo
 *~
 
+# Local temporary and private files
+/tmp/
+/private/
+
 # Python environments and bytecode
 .venv/
 venv/
