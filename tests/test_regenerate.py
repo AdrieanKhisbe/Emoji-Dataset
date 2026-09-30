@@ -320,7 +320,7 @@ def test_rate_limit_preserves_output_and_cached_download_resumes_later(output, s
     assert len(json.loads(index.read_text())) == 2
 
 
-def test_names_that_sanitize_identically_have_distinct_images(output, sources):
+def test_symbol_keycaps_have_readable_distinct_names_and_images(output, sources):
     sources.vendor("apple", "red")
     sources.unicode = "# Version: 17.0\n0023 FE0F 20E3 ; fully-qualified # #️⃣ E0.6 keycap: #\n002A FE0F 20E3 ; fully-qualified # *️⃣ E2.0 keycap: *\n"
     images = []
@@ -335,6 +335,9 @@ def test_names_that_sanitize_identically_have_distinct_images(output, sources):
     assert run(output, sources, "apple") == 0
     entries = generate_emoji_dataset.load_entries(output)
     paths = [Path(e["apple_emoji"]["image_path"]) for e in entries]
+    assert [e["name"] for e in entries] == ["keycap number sign", "keycap asterisk"]
+    assert [e["cldr_name"] for e in entries] == ["keycap: #", "keycap: *"]
+    assert [p.name for p in paths] == ["keycap number sign.png", "keycap asterisk.png"]
     assert paths[0] != paths[1]
     assert [path.read_bytes() for path in paths] == expected
 

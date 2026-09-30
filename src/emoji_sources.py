@@ -64,8 +64,12 @@ def read_unicode_index(text):
         if key in seen:
             raise SourceError(f"Duplicate Unicode sequence: {points}")
         seen.add(key)
+        filename_name = {
+            (0x23, 0x20E3): "keycap number sign",
+            (0x2A, 0x20E3): "keycap asterisk",
+        }.get(key, name)
         entries.append({"index": str(len(entries) + 1), "unicode": points,
-                        "name": re.sub(r"([^\s\w]|_)+", "", name).strip(),
+                        "name": re.sub(r"([^\s\w]|_)+", "", filename_name).strip(),
                         "cldr_name": name})
     if not entries:
         raise SourceError("Unicode index contains no fully-qualified emoji")
