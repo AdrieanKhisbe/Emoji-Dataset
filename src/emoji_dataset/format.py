@@ -1,4 +1,5 @@
 """Resource format shared by bundle production and installation."""
+
 import base64
 import hashlib
 import io
@@ -23,7 +24,11 @@ def encode_json(value: Any) -> bytes:
 
 
 def sequence(points: list[str]) -> str:
-    return "-".join(f"{int(point.removeprefix('U+'), 16):x}" for point in points if int(point.removeprefix('U+'), 16) != 0xFE0F)
+    return "-".join(
+        f"{int(point.removeprefix('U+'), 16):x}"
+        for point in points
+        if int(point.removeprefix("U+"), 16) != 0xFE0F
+    )
 
 
 def shortcode(value: str) -> str:
@@ -34,7 +39,13 @@ def shortcode(value: str) -> str:
 
 
 def filename(value: str) -> str:
-    if not value or value in {".", ".."} or "/" in value or "\\" in value or "\0" in value:
+    if (
+        not value
+        or value in {".", ".."}
+        or "/" in value
+        or "\\" in value
+        or "\0" in value
+    ):
         raise ValueError(f"Unsafe filename: {value!r}")
     return value.replace(" ", "_")
 
@@ -54,7 +65,7 @@ def preview_bytes(url: str) -> bytes:
     prefix = "data:image/png;base64,"
     if not url.startswith(prefix):
         raise ValueError("Preview must be a PNG data URL")
-    data = base64.b64decode(url[len(prefix):], validate=True)
+    data = base64.b64decode(url[len(prefix) :], validate=True)
     validate_png(data, preview=True)
     return data
 
@@ -67,7 +78,12 @@ def validate_index(index: dict[str, Any]) -> None:
     if not isinstance(index, dict) or index.get("schema") != SCHEMA:
         raise ValueError("Incompatible resource index schema")
     entries, aliases = index["entries"], index["aliases"]
-    if not isinstance(entries, dict) or not isinstance(aliases, dict) or not entries or not aliases:
+    if (
+        not isinstance(entries, dict)
+        or not isinstance(aliases, dict)
+        or not entries
+        or not aliases
+    ):
         raise ValueError("Resource index must contain emojis and shortcodes")
     for alias, key in aliases.items():
         if shortcode(alias) != alias or key not in entries:
@@ -77,7 +93,11 @@ def validate_index(index: dict[str, Any]) -> None:
             raise ValueError("Invalid emoji entry in index")
         if not re.fullmatch(r"[0-9a-f]+(?:-[0-9a-f]+)*", key):
             raise ValueError("Invalid Unicode key in index")
-        if not isinstance(entry["name"], str) or not isinstance(entry["cldr_name"], str) or entry["base"] not in entries:
+        if (
+            not isinstance(entry["name"], str)
+            or not isinstance(entry["cldr_name"], str)
+            or entry["base"] not in entries
+        ):
             raise ValueError("Invalid emoji entry in resource index")
         for tone, target in entry.get("tones", {}).items():
             if tone not in TONES or target not in entries:

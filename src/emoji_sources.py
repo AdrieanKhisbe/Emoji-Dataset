@@ -38,8 +38,11 @@ class SourceError(ValueError):
 
 def sequence_key(points):
     """Match vendor spellings that omit the emoji presentation selector."""
-    return tuple(int(point.removeprefix("U+"), 16) for point in points
-                 if int(point.removeprefix("U+"), 16) != 0xFE0F)
+    return tuple(
+        int(point.removeprefix("U+"), 16)
+        for point in points
+        if int(point.removeprefix("U+"), 16) != 0xFE0F
+    )
 
 
 def read_unicode_index(text):
@@ -68,9 +71,14 @@ def read_unicode_index(text):
             (0x23, 0x20E3): "keycap number sign",
             (0x2A, 0x20E3): "keycap asterisk",
         }.get(key, name)
-        entries.append({"index": str(len(entries) + 1), "unicode": points,
-                        "name": re.sub(r"([^\s\w]|_)+", "", filename_name).strip(),
-                        "cldr_name": name})
+        entries.append(
+            {
+                "index": str(len(entries) + 1),
+                "unicode": points,
+                "name": re.sub(r"([^\s\w]|_)+", "", filename_name).strip(),
+                "cldr_name": name,
+            }
+        )
     if not entries:
         raise SourceError("Unicode index contains no fully-qualified emoji")
     return version.group(1), entries
@@ -118,11 +126,23 @@ class HttpClient:
         return response
 
     def graphql(self, operation, query, variables):
-        payload = self.request("post", GRAPHQL_URL, json={
-            "operationName": operation, "query": query, "variables": variables,
-        }).json()
-        if not isinstance(payload, dict) or payload.get("errors") or not isinstance(payload.get("data"), dict):
-            raise SourceError(f"{operation}: invalid GraphQL response: {str(payload)[:300]}")
+        payload = self.request(
+            "post",
+            GRAPHQL_URL,
+            json={
+                "operationName": operation,
+                "query": query,
+                "variables": variables,
+            },
+        ).json()
+        if (
+            not isinstance(payload, dict)
+            or payload.get("errors")
+            or not isinstance(payload.get("data"), dict)
+        ):
+            raise SourceError(
+                f"{operation}: invalid GraphQL response: {str(payload)[:300]}"
+            )
         return payload["data"]
 
     def png(self, url):
@@ -151,7 +171,9 @@ class Catalog:
 def vendor_catalog(http, vendor):
     slug = VENDORS[vendor]
     variables = {"slug": slug, "lang": "EN"}
-    releases = http.graphql("VendorReleases", RELEASE_QUERY, variables).get("vendorHistoric_v1")
+    releases = http.graphql("VendorReleases", RELEASE_QUERY, variables).get(
+        "vendorHistoric_v1"
+    )
     if not isinstance(releases, list) or not releases:
         raise SourceError(f"{vendor}: missing release history")
     try:
@@ -162,7 +184,9 @@ def vendor_catalog(http, vendor):
             raise ValueError("invalid release slug")
     except (KeyError, TypeError, ValueError) as error:
         raise SourceError(f"{vendor}: invalid release history") from error
-    payload = http.graphql("VendorImages", IMAGE_QUERY, {**variables, "version": release})
+    payload = http.graphql(
+        "VendorImages", IMAGE_QUERY, {**variables, "version": release}
+    )
     try:
         groups = payload["vendorHistoricEmoji_v1"]["items"]
         images = {}
@@ -173,11 +197,17 @@ def vendor_catalog(http, vendor):
                 if item["status"] not in {"NEW", "CHANGED", "UNCHANGED"}:
                     raise ValueError("unknown image status")
                 source = item["image"]["source"]
-                if not re.fullmatch(rf"source/{re.escape(slug)}/\d+/[^/]+\.png", source):
+                if not re.fullmatch(
+                    rf"source/{re.escape(slug)}/\d+/[^/]+\.png", source
+                ):
                     raise ValueError(f"unexpected vendor image URL: {source}")
                 # Tone filenames can repeat the modifier after the full sequence.
-                candidates = re.findall(r"_([0-9a-f]{2,6}(?:-[0-9a-f]{2,6})*)(?=[_.])", source)
-                points = max(candidates, key=lambda value: len(value.split("-"))).split("-")
+                candidates = re.findall(
+                    r"_([0-9a-f]{2,6}(?:-[0-9a-f]{2,6})*)(?=[_.])", source
+                )
+                points = max(candidates, key=lambda value: len(value.split("-"))).split(
+                    "-"
+                )
                 key = sequence_key(points)
                 url = IMAGE_ORIGIN + source
                 if key in images and images[key] != url:

@@ -110,6 +110,9 @@ poetry check --lock
 Tests use pytest with temporary datasets and simulated HTTP sources. Run them
 with `poetry run poe test`. Python source modules live in `src/`.
 
+Format Python source and tests with `poetry run poe format`. Run
+`poetry run poe format-check` to check formatting; CI runs the same check.
+
 Run `poetry run poe typecheck` for CLI type checks and `poetry build` for the
 installable package. Commit `poetry.lock` when changing dependencies.
 

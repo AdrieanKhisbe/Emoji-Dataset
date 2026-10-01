@@ -1,4 +1,5 @@
 """Local resources and preferences; callers only see committed installations."""
+
 from contextlib import contextmanager
 import fcntl
 import io
@@ -12,7 +13,17 @@ import uuid
 from typing import Any, Iterator
 import zipfile
 
-from .format import SCHEMA, VENDORS, digest, encode_json, filename, read_json, validate_index, validate_png, preview_bytes
+from .format import (
+    SCHEMA,
+    VENDORS,
+    digest,
+    encode_json,
+    filename,
+    read_json,
+    validate_index,
+    validate_png,
+    preview_bytes,
+)
 
 
 def atomic_json(path: Path, value: Any) -> None:
@@ -28,8 +39,14 @@ def atomic_json(path: Path, value: Any) -> None:
 
 class Store:
     def __init__(self) -> None:
-        self.data = (Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "emojies").resolve()
-        self.config = (Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "emojies/config.json").resolve()
+        self.data = (
+            Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
+            / "emojies"
+        ).resolve()
+        self.config = (
+            Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+            / "emojies/config.json"
+        ).resolve()
 
     @contextmanager
     def locked(self, *, exclusive: bool = True) -> Iterator[None]:
@@ -55,7 +72,9 @@ class Store:
     def vendor(self, requested: str | None) -> str:
         vendor = requested or os.environ.get("EMOJI_VENDOR") or self.default_vendor()
         if not vendor or vendor not in self.installed():
-            raise ValueError(f"Vendor {vendor or '(none)'} is not installed. Run emoji install --vendor {vendor or 'apple'}.")
+            raise ValueError(
+                f"Vendor {vendor or '(none)'} is not installed. Run emoji install --vendor {vendor or 'apple'}."
+            )
         return vendor
 
     def collection(self, vendor: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -63,7 +82,9 @@ class Store:
         index = read_json(self.data / "indexes" / f"{installation['index']}.json")
         return index, installation["records"]
 
-    def install(self, vendor: str, release: str, index_bytes: bytes, bundle: bytes) -> str | None:
+    def install(
+        self, vendor: str, release: str, index_bytes: bytes, bundle: bytes
+    ) -> str | None:
         index = json.loads(index_bytes)
         validate_index(index)
         index_hash = digest(index_bytes)
@@ -72,7 +93,9 @@ class Store:
         destination = parent / vendor
         backup = parent / f".{vendor}-previous"
         if backup.exists():
-            raise ValueError(f"Recovery copy exists: {backup}. Restore it before retrying.")
+            raise ValueError(
+                f"Recovery copy exists: {backup}. Restore it before retrying."
+            )
         previous = self.installed().get(vendor, {})
         with tempfile.TemporaryDirectory(dir=parent, prefix=f".{vendor}-") as directory:
             staged = Path(directory) / "next"
@@ -119,20 +142,32 @@ class Store:
                     for extension in (".png", ".url"):
                         target = str(Path(name).with_suffix(extension))
                         data = archive.read(f"images/{target}")
-                        checksum = record["sha256" if extension == ".png" else "url_sha256"]
+                        checksum = record[
+                            "sha256" if extension == ".png" else "url_sha256"
+                        ]
                         if digest(data) != checksum:
                             raise ValueError(f"Checksum mismatch for {target}")
                         if extension == ".png":
                             validate_png(data)
                         else:
                             preview_bytes(data.decode("utf-8"))
-                        destination_name = str(Path(installed_name).with_suffix(extension))
+                        destination_name = str(
+                            Path(installed_name).with_suffix(extension)
+                        )
                         (staged / destination_name).write_bytes(data)
                         (staged / destination_name).chmod(0o444)
                     record["filename"] = installed_name
             atomic_json(self.data / "indexes" / f"{index_hash}.json", index)
-            atomic_json(staged / "installation.json", {"release": release, "index": index_hash,
-                "installed_at": previous.get("installed_at", time.time_ns()), "records": records, "paths": paths})
+            atomic_json(
+                staged / "installation.json",
+                {
+                    "release": release,
+                    "index": index_hash,
+                    "installed_at": previous.get("installed_at", time.time_ns()),
+                    "records": records,
+                    "paths": paths,
+                },
+            )
             obsolete = parent / f".{vendor}-obsolete-{uuid.uuid4().hex}"
             if destination.exists():
                 os.replace(destination, backup)

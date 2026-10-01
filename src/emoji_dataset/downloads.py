@@ -1,4 +1,5 @@
 """Resolve resource releases once and download their checksummed assets."""
+
 import json
 import random
 import time
@@ -32,24 +33,39 @@ class ReleaseClient:
                         retry_after = float(header)
                     except ValueError:
                         try:
-                            retry_after = (parsedate_to_datetime(header) - datetime.now(timezone.utc)).total_seconds()
+                            retry_after = (
+                                parsedate_to_datetime(header)
+                                - datetime.now(timezone.utc)
+                            ).total_seconds()
                         except (ValueError, TypeError, OverflowError):
                             retry_after = 0
                 if retry_after > 60:
-                    raise ValueError(f"Server requests a {retry_after:.0f}s wait. Wait and rerun emoji install.")
+                    raise ValueError(
+                        f"Server requests a {retry_after:.0f}s wait. Wait and rerun emoji install."
+                    )
                 response.raise_for_status()
-            except (requests.ConnectionError, requests.Timeout, requests.HTTPError,
-                    requests.exceptions.ChunkedEncodingError) as error:
+            except (
+                requests.ConnectionError,
+                requests.Timeout,
+                requests.HTTPError,
+                requests.exceptions.ChunkedEncodingError,
+            ) as error:
                 if isinstance(error, requests.HTTPError):
-                    status = error.response.status_code if error.response is not None else 0
+                    status = (
+                        error.response.status_code if error.response is not None else 0
+                    )
                     if status != 429 and status < 500:
                         raise
                 if attempt == 2:
                     raise
-                time.sleep(min(60, max(retry_after, 2 ** attempt + random.uniform(0, 0.25))))
+                time.sleep(
+                    min(60, max(retry_after, 2**attempt + random.uniform(0, 0.25)))
+                )
         raise AssertionError("Unreachable retry state")
 
-    def asset(self, release: dict[str, Any], name: str, checksum: str | None = None) -> bytes:
+    def asset(
+        self, release: dict[str, Any], name: str, checksum: str | None = None
+    ) -> bytes:
         asset = next((a for a in release["assets"] if a["name"] == name), None)
         if asset is None:
             raise ValueError(f"Release has no {name}")
@@ -61,12 +77,17 @@ class ReleaseClient:
 
     def releases(self, tag: str | None) -> Iterator[dict[str, Any]]:
         from urllib.parse import quote
+
         if tag:
-            yield json.loads(self.download(f"{RELEASES_URL}/tags/{quote(tag, safe='')}"))
+            yield json.loads(
+                self.download(f"{RELEASES_URL}/tags/{quote(tag, safe='')}")
+            )
             return
         page = 1
         while True:
-            releases = json.loads(self.download(f"{RELEASES_URL}?per_page=100&page={page}"))
+            releases = json.loads(
+                self.download(f"{RELEASES_URL}?per_page=100&page={page}")
+            )
             yield from releases
             if len(releases) < 100:
                 return
@@ -74,12 +95,19 @@ class ReleaseClient:
 
     def resolve(self, tag: str | None) -> tuple[dict[str, Any], dict[str, Any]]:
         for release in self.releases(tag):
-            if release.get("draft") or release.get("prerelease") or not release.get("immutable"):
+            if (
+                release.get("draft")
+                or release.get("prerelease")
+                or not release.get("immutable")
+            ):
                 continue
             if not any(a["name"] == "manifest.json" for a in release.get("assets", [])):
                 continue
             manifest = json.loads(self.asset(release, "manifest.json"))
-            if manifest.get("schema") == SCHEMA and manifest.get("release") == release["tag_name"]:
+            if (
+                manifest.get("schema") == SCHEMA
+                and manifest.get("release") == release["tag_name"]
+            ):
                 return release, manifest
         raise ValueError(
             "No compatible immutable resource release found. "

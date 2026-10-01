@@ -1,4 +1,5 @@
 """Exercise the installed CLI contract against tiny, real resource bundles."""
+
 import base64
 import hashlib
 import io
@@ -25,7 +26,11 @@ def resources(tmp_path):
     entries = [
         {"unicode": ["U+1F600"], "name": "grinning face", "cldr_name": "grinning face"},
         {"unicode": ["U+1F44B"], "name": "waving hand", "cldr_name": "waving hand"},
-        {"unicode": ["U+1F44B", "U+1F3FF"], "name": "waving hand dark skin tone", "cldr_name": "waving hand: dark skin tone"},
+        {
+            "unicode": ["U+1F44B", "U+1F3FF"],
+            "name": "waving hand dark skin tone",
+            "cldr_name": "waving hand: dark skin tone",
+        },
     ]
     (dataset / "dataset.json").write_text(json.dumps(entries))
     for vendor, color in [("apple", "red"), ("google", "blue")]:
@@ -35,24 +40,46 @@ def resources(tmp_path):
         for entry in entries:
             image = folder / (entry["name"] + ".png")
             image.write_bytes(png(color))
-            records.append({"unicode": entry["unicode"], "image_path": str(image),
-                            "data_uri": "data:image/png;base64," + base64.b64encode(png(color)).decode(),
-                            "source": {"vendor": vendor, "sha256": hashlib.sha256(png(color)).hexdigest()}})
+            records.append(
+                {
+                    "unicode": entry["unicode"],
+                    "image_path": str(image),
+                    "data_uri": "data:image/png;base64,"
+                    + base64.b64encode(png(color)).decode(),
+                    "source": {
+                        "vendor": vendor,
+                        "sha256": hashlib.sha256(png(color)).hexdigest(),
+                    },
+                }
+            )
         (dataset / "vendors" / f"{vendor}.json").write_text(json.dumps(records))
     aliases = tmp_path / "aliases.json"
-    aliases.write_text(json.dumps([
-        {"emoji": "😀", "aliases": ["grinning", "happy_face", "install"]},
-        {"emoji": "👋", "aliases": ["wave"]},
-        {"emoji": "👋🏿", "aliases": ["dark_wave"]},
-    ]))
+    aliases.write_text(
+        json.dumps(
+            [
+                {"emoji": "😀", "aliases": ["grinning", "happy_face", "install"]},
+                {"emoji": "👋", "aliases": ["wave"]},
+                {"emoji": "👋🏿", "aliases": ["dark_wave"]},
+            ]
+        )
+    )
     return dataset, aliases
 
 
 def build(resources, tmp_path, release="resources-v1", vendors=("apple", "google")):
     from emoji_dataset.bundles import cli
+
     output = tmp_path / release
-    args = ["--dataset", str(resources[0]), "--aliases", str(resources[1]),
-            "--release", release, "--output", str(output)]
+    args = [
+        "--dataset",
+        str(resources[0]),
+        "--aliases",
+        str(resources[1]),
+        "--release",
+        release,
+        "--output",
+        str(output),
+    ]
     for vendor in vendors:
         args += ["--vendor", vendor]
     result = CliRunner().invoke(cli, args)
@@ -66,7 +93,10 @@ def test_bundle_command_preserves_originals_and_previews(resources, tmp_path):
     assert manifest["schema"] == 1
     with zipfile.ZipFile(output / "apple.zip") as archive:
         assert archive.read("images/grinning_face.png") == png()
-        assert archive.read("images/grinning_face.url").decode() == "data:image/png;base64," + base64.b64encode(png()).decode()
+        assert (
+            archive.read("images/grinning_face.url").decode()
+            == "data:image/png;base64," + base64.b64encode(png()).decode()
+        )
     assert not (output / "windows.zip").exists()
 
 
@@ -89,9 +119,23 @@ def releases(monkeypatch):
             url = f"https://github.com/AdrieanKhisbe/emoji-toolkit/releases/download/{folder.name}/{path.name}"
             data = path.read_bytes()
             responses[url] = data
-            assets.append({"name": path.name, "browser_download_url": url, "digest": "sha256:" + hashlib.sha256(data).hexdigest()})
-        releases.insert(0, {"tag_name": folder.name, "immutable": True, "draft": False,
-                            "prerelease": False, "assets": assets})
+            assets.append(
+                {
+                    "name": path.name,
+                    "browser_download_url": url,
+                    "digest": "sha256:" + hashlib.sha256(data).hexdigest(),
+                }
+            )
+        releases.insert(
+            0,
+            {
+                "tag_name": folder.name,
+                "immutable": True,
+                "draft": False,
+                "prerelease": False,
+                "assets": assets,
+            },
+        )
 
     def get(session, url, **kwargs):
         response = requests.Response()
@@ -123,10 +167,13 @@ def releases(monkeypatch):
 
 def invoke(terminal, *args):
     from emoji_dataset.cli import cli
+
     return terminal.invoke(cli, list(args))
 
 
-def test_install_then_lookup_is_offline_and_returns_original_and_preview(resources, tmp_path, terminal, releases):
+def test_install_then_lookup_is_offline_and_returns_original_and_preview(
+    resources, tmp_path, terminal, releases
+):
     releases(build(resources, tmp_path))
     installed = invoke(terminal, "install", "--vendor", "apple")
     assert installed.exit_code == 0, installed.output
@@ -139,16 +186,24 @@ def test_install_then_lookup_is_offline_and_returns_original_and_preview(resourc
     assert image.read_bytes() == png()
     assert image.stat().st_mode & 0o222 == 0
     url = invoke(terminal, "grinning", "--url")
-    assert url.stdout.strip() == "data:image/png;base64," + base64.b64encode(png()).decode()
+    assert (
+        url.stdout.strip()
+        == "data:image/png;base64," + base64.b64encode(png()).decode()
+    )
     url_file = invoke(terminal, "grinning", "--url-file")
     assert Path(url_file.stdout.strip()).read_text() == url.stdout.strip()
     assert invoke(terminal, ":happy-face:").stdout == path.stdout
     assert invoke(terminal, "grinning", "--data-url").stdout == url.stdout
 
 
-def test_preferences_tones_listing_and_reserved_words(resources, tmp_path, terminal, releases, monkeypatch):
+def test_preferences_tones_listing_and_reserved_words(
+    resources, tmp_path, terminal, releases, monkeypatch
+):
     releases(build(resources, tmp_path))
-    assert invoke(terminal, "install", "--vendor", "google", "--vendor", "apple").exit_code == 0
+    assert (
+        invoke(terminal, "install", "--vendor", "google", "--vendor", "apple").exit_code
+        == 0
+    )
     assert "/google/" in invoke(terminal, "wave").stdout
     assert invoke(terminal, "config", "set", "vendor", "apple").exit_code == 0
     assert "/apple/" in invoke(terminal, "wave").stdout
@@ -157,8 +212,13 @@ def test_preferences_tones_listing_and_reserved_words(resources, tmp_path, termi
     assert "/apple/" in invoke(terminal, "wave", "--vendor", "apple").stdout
     assert invoke(terminal, "config", "set", "skin-tone", "dark").exit_code == 0
     assert "waving_hand_dark_skin_tone.png" in invoke(terminal, "wave").stdout
-    assert "waving_hand.png" in invoke(terminal, "dark_wave", "--skin-tone", "none").stdout
-    assert "grinning_face.png" in invoke(terminal, "grinning", "--skin-tone", "dark").stdout
+    assert (
+        "waving_hand.png" in invoke(terminal, "dark_wave", "--skin-tone", "none").stdout
+    )
+    assert (
+        "grinning_face.png"
+        in invoke(terminal, "grinning", "--skin-tone", "dark").stdout
+    )
     assert invoke(terminal, "wave", "--skin-tone", "purple").exit_code != 0
     assert invoke(terminal, "config", "set", "vendor", "windows").exit_code != 0
     assert invoke(terminal, "config", "unset", "vendor").exit_code == 0
@@ -175,9 +235,14 @@ def test_preferences_tones_listing_and_reserved_words(resources, tmp_path, termi
     assert "waving_hand_dark_skin_tone.png" in invoke(terminal, "dark_wave").stdout
 
 
-def test_update_preserves_paths_and_other_vendors_release_aliases(resources, tmp_path, terminal, releases):
+def test_update_preserves_paths_and_other_vendors_release_aliases(
+    resources, tmp_path, terminal, releases
+):
     releases(build(resources, tmp_path))
-    assert invoke(terminal, "install", "--vendor", "apple", "--vendor", "google").exit_code == 0
+    assert (
+        invoke(terminal, "install", "--vendor", "apple", "--vendor", "google").exit_code
+        == 0
+    )
     original = invoke(terminal, "grinning").stdout
     dataset, aliases = resources
     entries = json.loads((dataset / "dataset.json").read_text())
@@ -210,8 +275,11 @@ def test_update_preserves_paths_and_other_vendors_release_aliases(resources, tmp
 
 
 @pytest.mark.parametrize("corruption", ["gif", "checksum", "preview"])
-def test_builder_rejects_invalid_artwork_without_publishing(resources, tmp_path, corruption):
+def test_builder_rejects_invalid_artwork_without_publishing(
+    resources, tmp_path, corruption
+):
     from emoji_dataset.bundles import cli
+
     dataset, aliases = resources
     path = dataset / "vendors/apple.json"
     records = json.loads(path.read_text())
@@ -223,8 +291,21 @@ def test_builder_rejects_invalid_artwork_without_publishing(resources, tmp_path,
         records[0]["data_uri"] = "data:image/png;base64,bm90IGEgcG5n"
     path.write_text(json.dumps(records))
     output = tmp_path / "invalid"
-    result = CliRunner().invoke(cli, ["--dataset", str(dataset), "--aliases", str(aliases),
-                                    "--output", str(output), "--release", "bad", "--vendor", "apple"])
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--dataset",
+            str(dataset),
+            "--aliases",
+            str(aliases),
+            "--output",
+            str(output),
+            "--release",
+            "bad",
+            "--vendor",
+            "apple",
+        ],
+    )
     assert result.exit_code != 0
     assert "Error:" in result.stderr
     assert not output.exists()
@@ -239,7 +320,9 @@ def tamper_bundle(folder, corruption):
         Image.new("RGB", (2, 2)).save(stream, format="GIF")
         files["images/grinning_face.png"] = stream.getvalue()
         metadata = json.loads(files["vendor.json"])
-        metadata["records"]["1f600"]["sha256"] = hashlib.sha256(stream.getvalue()).hexdigest()
+        metadata["records"]["1f600"]["sha256"] = hashlib.sha256(
+            stream.getvalue()
+        ).hexdigest()
         files["vendor.json"] = json.dumps(metadata).encode()
     elif corruption == "checksum":
         files["images/grinning_face.png"] = png("black")
@@ -258,25 +341,35 @@ def tamper_bundle(folder, corruption):
     elif corruption == "preview":
         files["images/grinning_face.url"] = b"data:image/png;base64,bm90IGEgcG5n"
         metadata = json.loads(files["vendor.json"])
-        metadata["records"]["1f600"]["url_sha256"] = hashlib.sha256(files["images/grinning_face.url"]).hexdigest()
+        metadata["records"]["1f600"]["url_sha256"] = hashlib.sha256(
+            files["images/grinning_face.url"]
+        ).hexdigest()
         files["vendor.json"] = json.dumps(metadata).encode()
     with zipfile.ZipFile(path, "w") as archive:
         for name, data in files.items():
             archive.writestr(name, data)
     manifest = json.loads((folder / "manifest.json").read_text())
-    manifest["vendors"]["apple"]["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    manifest["vendors"]["apple"]["sha256"] = hashlib.sha256(
+        path.read_bytes()
+    ).hexdigest()
     (folder / "manifest.json").write_text(json.dumps(manifest))
 
 
-@pytest.mark.parametrize("corruption", ["gif", "checksum", "unsafe", "identity", "schema", "preview"])
-def test_invalid_update_preserves_previous_vendor_and_continues_batch(resources, tmp_path, terminal, releases, corruption):
+@pytest.mark.parametrize(
+    "corruption", ["gif", "checksum", "unsafe", "identity", "schema", "preview"]
+)
+def test_invalid_update_preserves_previous_vendor_and_continues_batch(
+    resources, tmp_path, terminal, releases, corruption
+):
     releases(build(resources, tmp_path))
     assert invoke(terminal, "install", "--vendor", "apple").exit_code == 0
     original = invoke(terminal, "grinning").stdout
     next_release = build(resources, tmp_path, "resources-v2")
     tamper_bundle(next_release, corruption)
     releases(next_release)
-    update = invoke(terminal, "install", "--update", "--vendor", "apple", "--vendor", "google")
+    update = invoke(
+        terminal, "install", "--update", "--vendor", "apple", "--vendor", "google"
+    )
     assert update.exit_code != 0 and "apple" in update.stderr
     assert invoke(terminal, "grinning").stdout == original
     assert Path(original.strip()).read_bytes() == png()
@@ -286,8 +379,11 @@ def test_invalid_update_preserves_previous_vendor_and_continues_batch(resources,
 
 
 @pytest.mark.parametrize("failure", ["timeout", "interrupted", 429, 503])
-def test_install_retries_transient_downloads(resources, tmp_path, terminal, releases, monkeypatch, failure):
+def test_install_retries_transient_downloads(
+    resources, tmp_path, terminal, releases, monkeypatch, failure
+):
     import time
+
     waits = []
     monkeypatch.setattr(time, "sleep", waits.append)
     folder = build(resources, tmp_path)
@@ -297,7 +393,9 @@ def test_install_retries_transient_downloads(resources, tmp_path, terminal, rele
     if failure == "timeout":
         error = requests.Timeout("slow network")
     elif failure == "interrupted":
-        error = requests.exceptions.ChunkedEncodingError("Connection broken: IncompleteRead")
+        error = requests.exceptions.ChunkedEncodingError(
+            "Connection broken: IncompleteRead"
+        )
     else:
         error = requests.Response()
         error.status_code = failure
@@ -310,9 +408,15 @@ def test_install_retries_transient_downloads(resources, tmp_path, terminal, rele
     assert invoke(terminal, "grinning").exit_code == 0
 
 
-@pytest.mark.parametrize("status, retry_after, attempts", [(404, None, 1), (429, "61", 1), (503, None, 3), ("interrupted", None, 3)])
-def test_install_stops_after_permanent_error_long_wait_or_retry_budget(resources, tmp_path, terminal, releases, monkeypatch, status, retry_after, attempts):
+@pytest.mark.parametrize(
+    "status, retry_after, attempts",
+    [(404, None, 1), (429, "61", 1), (503, None, 3), ("interrupted", None, 3)],
+)
+def test_install_stops_after_permanent_error_long_wait_or_retry_budget(
+    resources, tmp_path, terminal, releases, monkeypatch, status, retry_after, attempts
+):
     import time
+
     monkeypatch.setattr(time, "sleep", lambda _: None)
     releases(build(resources, tmp_path))
     url = next(url for url in releases.responses if url.endswith("/apple.zip"))
@@ -321,7 +425,9 @@ def test_install_stops_after_permanent_error_long_wait_or_retry_budget(resources
     if retry_after:
         error.headers["Retry-After"] = retry_after
     if status == "interrupted":
-        error = requests.exceptions.ChunkedEncodingError("Connection broken: IncompleteRead")
+        error = requests.exceptions.ChunkedEncodingError(
+            "Connection broken: IncompleteRead"
+        )
     replies = [error] * 4
     releases.responses[url] = replies
     result = invoke(terminal, "install", "--vendor", "apple")
@@ -330,7 +436,9 @@ def test_install_stops_after_permanent_error_long_wait_or_retry_budget(resources
     assert invoke(terminal, "grinning").exit_code != 0
 
 
-def test_latest_compatible_release_and_explicit_pin(resources, tmp_path, terminal, releases):
+def test_latest_compatible_release_and_explicit_pin(
+    resources, tmp_path, terminal, releases
+):
     old = build(resources, tmp_path)
     releases(old)
     newer = build(resources, tmp_path, "resources-v2")
@@ -340,21 +448,46 @@ def test_latest_compatible_release_and_explicit_pin(resources, tmp_path, termina
     releases(newer)
     assert invoke(terminal, "install", "--vendor", "apple").exit_code == 0
     assert "resources-v1" in invoke(terminal, "status").stdout
-    assert invoke(terminal, "install", "--vendor", "google", "--release", "resources-v2").exit_code != 0
-    assert invoke(terminal, "install", "--vendor", "google", "--release", "resources-v1").exit_code == 0
+    assert (
+        invoke(
+            terminal, "install", "--vendor", "google", "--release", "resources-v2"
+        ).exit_code
+        != 0
+    )
+    assert (
+        invoke(
+            terminal, "install", "--vendor", "google", "--release", "resources-v1"
+        ).exit_code
+        == 0
+    )
     releases.releases[-1]["immutable"] = False
-    assert invoke(terminal, "install", "--vendor", "google", "--update", "--release", "resources-v1").exit_code != 0
+    assert (
+        invoke(
+            terminal,
+            "install",
+            "--vendor",
+            "google",
+            "--update",
+            "--release",
+            "resources-v1",
+        ).exit_code
+        != 0
+    )
 
 
-def test_install_selection_and_first_success_default(resources, tmp_path, terminal, releases, monkeypatch):
+def test_install_selection_and_first_success_default(
+    resources, tmp_path, terminal, releases, monkeypatch
+):
     import sys
     from emoji_dataset.cli import cli
+
     assert invoke(terminal, "install").exit_code != 0
     assert invoke(terminal, "install", "--update").exit_code != 0
     releases(build(resources, tmp_path))
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     # CliRunner replaces stdin; use its stream's TTY contract at the system boundary.
     from click.testing import _NamedTextIOWrapper
+
     monkeypatch.setattr(_NamedTextIOWrapper, "isatty", lambda self: True)
     result = terminal.invoke(cli, ["install"], input="google,apple\n")
     assert result.exit_code == 0, result.output
@@ -362,8 +495,11 @@ def test_install_selection_and_first_success_default(resources, tmp_path, termin
     assert "google: resources-v1 (default)" in invoke(terminal, "status").stdout
 
 
-def test_publication_failure_rolls_back_old_artwork(resources, tmp_path, terminal, releases, monkeypatch):
+def test_publication_failure_rolls_back_old_artwork(
+    resources, tmp_path, terminal, releases, monkeypatch
+):
     import os
+
     releases(build(resources, tmp_path))
     assert invoke(terminal, "install", "--vendor", "apple").exit_code == 0
     before = invoke(terminal, "grinning").stdout
@@ -383,7 +519,9 @@ def test_publication_failure_rolls_back_old_artwork(resources, tmp_path, termina
     assert "apple: resources-v1" in invoke(terminal, "status").stdout
 
 
-def test_latest_search_continues_past_a_page_of_unrelated_releases(resources, tmp_path, terminal, releases, monkeypatch):
+def test_latest_search_continues_past_a_page_of_unrelated_releases(
+    resources, tmp_path, terminal, releases, monkeypatch
+):
     releases(build(resources, tmp_path))
     original_get = requests.Session.get
 
@@ -391,7 +529,12 @@ def test_latest_search_continues_past_a_page_of_unrelated_releases(resources, tm
         if "/releases?" in url and url.endswith("page=1"):
             response = requests.Response()
             response.status_code = 200
-            response._content = json.dumps([{"tag_name": f"program-{i}", "immutable": True, "assets": []} for i in range(100)]).encode()
+            response._content = json.dumps(
+                [
+                    {"tag_name": f"program-{i}", "immutable": True, "assets": []}
+                    for i in range(100)
+                ]
+            ).encode()
             return response
         return original_get(session, url.replace("page=2", "page=1"), **kwargs)
 
@@ -400,7 +543,9 @@ def test_latest_search_continues_past_a_page_of_unrelated_releases(resources, tm
     assert result.exit_code == 0, result.output
 
 
-def test_skin_tones_handle_hair_names_and_expanded_handshake_sequences(resources, tmp_path, terminal, releases):
+def test_skin_tones_handle_hair_names_and_expanded_handshake_sequences(
+    resources, tmp_path, terminal, releases
+):
     dataset, aliases = resources
     extra = [
         ("1f471", "person: blond hair", "blond"),
@@ -416,30 +561,57 @@ def test_skin_tones_handle_hair_names_and_expanded_handshake_sequences(resources
         entries.append({"unicode": points, "name": alias, "cldr_name": name})
         path = dataset / "images/apple" / f"{alias}.png"
         path.write_bytes(png())
-        records.append({"unicode": points, "image_path": str(path), "data_uri": records[0]["data_uri"]})
-        names.append({"emoji": "".join(chr(int(part, 16)) for part in key.split("-")), "aliases": [alias]})
+        records.append(
+            {
+                "unicode": points,
+                "image_path": str(path),
+                "data_uri": records[0]["data_uri"],
+            }
+        )
+        names.append(
+            {
+                "emoji": "".join(chr(int(part, 16)) for part in key.split("-")),
+                "aliases": [alias],
+            }
+        )
     (dataset / "dataset.json").write_text(json.dumps(entries))
     (dataset / "vendors/apple.json").write_text(json.dumps(records))
     aliases.write_text(json.dumps(names))
     releases(build(resources, tmp_path, vendors=("apple",)))
     assert invoke(terminal, "install", "--vendor", "apple").exit_code == 0
-    assert invoke(terminal, "blond", "--skin-tone", "dark").stdout == invoke(terminal, "dark_blond").stdout
-    assert invoke(terminal, "dark_blond", "--skin-tone", "none").stdout == invoke(terminal, "blond").stdout
-    assert invoke(terminal, "handshake", "--skin-tone", "dark").stdout == invoke(terminal, "dark_handshake").stdout
+    assert (
+        invoke(terminal, "blond", "--skin-tone", "dark").stdout
+        == invoke(terminal, "dark_blond").stdout
+    )
+    assert (
+        invoke(terminal, "dark_blond", "--skin-tone", "none").stdout
+        == invoke(terminal, "blond").stdout
+    )
+    assert (
+        invoke(terminal, "handshake", "--skin-tone", "dark").stdout
+        == invoke(terminal, "dark_handshake").stdout
+    )
 
 
-def test_missing_vendor_artwork_never_falls_back(resources, tmp_path, terminal, releases):
+def test_missing_vendor_artwork_never_falls_back(
+    resources, tmp_path, terminal, releases
+):
     dataset, _ = resources
     path = dataset / "vendors/google.json"
     path.write_text(json.dumps(json.loads(path.read_text())[1:]))
     releases(build(resources, tmp_path))
-    assert invoke(terminal, "install", "--vendor", "apple", "--vendor", "google").exit_code == 0
+    assert (
+        invoke(terminal, "install", "--vendor", "apple", "--vendor", "google").exit_code
+        == 0
+    )
     result = invoke(terminal, "grinning", "--vendor", "google")
     assert result.exit_code != 0 and result.stdout == "" and "google" in result.stderr
     assert invoke(terminal, "list", "grinning", "--vendor", "google").stdout == ""
 
 
-def test_corrupt_index_rejects_install_with_actionable_error(resources, tmp_path, terminal, releases):
+def test_corrupt_index_rejects_install_with_actionable_error(
+    resources, tmp_path, terminal, releases
+):
     folder = build(resources, tmp_path)
     (folder / "index.json").write_text("[]")
     manifest = json.loads((folder / "manifest.json").read_text())
@@ -451,7 +623,9 @@ def test_corrupt_index_rejects_install_with_actionable_error(resources, tmp_path
     assert invoke(terminal, "grinning").exit_code != 0
 
 
-def test_all_install_uses_apple_first_and_keeps_successes(resources, tmp_path, terminal, releases):
+def test_all_install_uses_apple_first_and_keeps_successes(
+    resources, tmp_path, terminal, releases
+):
     releases(build(resources, tmp_path))
     result = invoke(terminal, "install", "--all")
     assert result.exit_code != 0  # The fixture intentionally provides only two vendors.
@@ -462,7 +636,9 @@ def test_all_install_uses_apple_first_and_keeps_successes(resources, tmp_path, t
     assert invoke(terminal, "install", "--vendor", "apple").exit_code == 0
 
 
-def test_first_failed_vendor_does_not_become_default(resources, tmp_path, terminal, releases):
+def test_first_failed_vendor_does_not_become_default(
+    resources, tmp_path, terminal, releases
+):
     folder = build(resources, tmp_path)
     tamper_bundle(folder, "checksum")
     releases(folder)
@@ -471,7 +647,9 @@ def test_first_failed_vendor_does_not_become_default(resources, tmp_path, termin
     assert "google: resources-v1 (default)" in invoke(terminal, "status").stdout
 
 
-def test_bare_negative_shortcode_matches_colon_form(resources, tmp_path, terminal, releases):
+def test_bare_negative_shortcode_matches_colon_form(
+    resources, tmp_path, terminal, releases
+):
     aliases = resources[1]
     names = json.loads(aliases.read_text())
     names[0]["aliases"].append("-1")
@@ -486,8 +664,11 @@ def test_bare_negative_shortcode_matches_colon_form(resources, tmp_path, termina
     assert before.stdout == invoke(terminal, ":-1:", "--url").stdout
 
 
-def test_backup_cleanup_failure_reports_success_and_allows_later_update(resources, tmp_path, terminal, releases, monkeypatch):
+def test_backup_cleanup_failure_reports_success_and_allows_later_update(
+    resources, tmp_path, terminal, releases, monkeypatch
+):
     import shutil
+
     releases(build(resources, tmp_path))
     assert invoke(terminal, "install", "--vendor", "apple").exit_code == 0
     releases(build(resources, tmp_path, "resources-v2"))
@@ -508,10 +689,13 @@ def test_backup_cleanup_failure_reports_success_and_allows_later_update(resource
     assert result.exit_code == 0, result.output
 
 
-def test_offline_lookup_is_available_while_update_downloads(resources, tmp_path, terminal, releases, monkeypatch):
+def test_offline_lookup_is_available_while_update_downloads(
+    resources, tmp_path, terminal, releases, monkeypatch
+):
     import os
     import subprocess
     import sys
+
     releases(build(resources, tmp_path))
     assert invoke(terminal, "install", "--vendor", "apple").exit_code == 0
     original = invoke(terminal, "grinning").stdout
@@ -520,20 +704,34 @@ def test_offline_lookup_is_available_while_update_downloads(resources, tmp_path,
 
     def lookup_during_download(session, url, **kwargs):
         if url.endswith("/apple.zip"):
-            result = subprocess.run([sys.executable, "-m", "emoji_dataset.cli", "grinning"],
-                                    env={**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")},
-                                    capture_output=True, text=True, timeout=10)
+            result = subprocess.run(
+                [sys.executable, "-m", "emoji_dataset.cli", "grinning"],
+                env={
+                    **os.environ,
+                    "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"),
+                },
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             lookups.append(result)
         return real_get(session, url, **kwargs)
 
     monkeypatch.setattr(requests.Session, "get", lookup_during_download)
     updated = invoke(terminal, "install", "--update")
     assert updated.exit_code == 0, updated.output
-    assert len(lookups) == 1 and lookups[0].returncode == 0 and lookups[0].stdout == original
+    assert (
+        len(lookups) == 1
+        and lookups[0].returncode == 0
+        and lookups[0].stdout == original
+    )
 
 
-def test_retiring_backup_failure_rolls_back_update(resources, tmp_path, terminal, releases, monkeypatch):
+def test_retiring_backup_failure_rolls_back_update(
+    resources, tmp_path, terminal, releases, monkeypatch
+):
     import os
+
     releases(build(resources, tmp_path))
     assert invoke(terminal, "install", "--vendor", "apple").exit_code == 0
     releases(build(resources, tmp_path, "resources-v2"))
@@ -555,19 +753,39 @@ def test_retiring_backup_failure_rolls_back_update(resources, tmp_path, terminal
 def test_config_vendor_exposes_click_choices(terminal):
     help_result = invoke(terminal, "config", "set", "vendor", "--help")
     assert help_result.exit_code == 0
-    for vendor in ("apple", "emojione", "facebook", "google", "samsung", "twitter", "windows"):
+    for vendor in (
+        "apple",
+        "emojione",
+        "facebook",
+        "google",
+        "samsung",
+        "twitter",
+        "windows",
+    ):
         assert vendor in "".join(help_result.stdout.split())
     invalid = invoke(terminal, "config", "set", "vendor", "unknown")
     assert invalid.exit_code == 2
     assert "Invalid value" in invalid.stderr and "apple" in invalid.stderr
 
 
-def test_install_directly_from_source_is_offline_with_aliases(resources, terminal, monkeypatch):
+def test_install_directly_from_source_is_offline_with_aliases(
+    resources, terminal, monkeypatch
+):
     def unexpected_network(*args, **kwargs):
         pytest.fail("Local installation with aliases must not use the network")
+
     monkeypatch.setattr(requests.Session, "get", unexpected_network)
     dataset, aliases = resources
-    result = invoke(terminal, "install", "--vendor", "apple", "--local-override", str(dataset), "--aliases", str(aliases))
+    result = invoke(
+        terminal,
+        "install",
+        "--vendor",
+        "apple",
+        "--local-override",
+        str(dataset),
+        "--aliases",
+        str(aliases),
+    )
     assert result.exit_code == 0, result.output
     image = Path(invoke(terminal, "grinning").stdout.strip())
     assert image.read_bytes() == png()
@@ -575,12 +793,24 @@ def test_install_directly_from_source_is_offline_with_aliases(resources, termina
     assert "local:" in invoke(terminal, "status").stdout
     # Local updates follow the same validation and preservation rules.
     (dataset / "images/apple/grinning face.png").write_bytes(b"broken")
-    result = invoke(terminal, "install", "--vendor", "apple", "--local-overidde", str(dataset), "--aliases", str(aliases), "--update")
+    result = invoke(
+        terminal,
+        "install",
+        "--vendor",
+        "apple",
+        "--local-overidde",
+        str(dataset),
+        "--aliases",
+        str(aliases),
+        "--update",
+    )
     assert result.exit_code != 0
     assert image.read_bytes() == png()
 
 
-def test_local_source_fetches_only_pinned_aliases_when_omitted(resources, terminal, monkeypatch):
+def test_local_source_fetches_only_pinned_aliases_when_omitted(
+    resources, terminal, monkeypatch
+):
     dataset, aliases = resources
     urls = []
 
@@ -592,33 +822,70 @@ def test_local_source_fetches_only_pinned_aliases_when_omitted(resources, termin
         return response
 
     monkeypatch.setattr(requests.Session, "get", get)
-    result = invoke(terminal, "install", "--vendor", "apple", "--local-override", str(dataset))
+    result = invoke(
+        terminal, "install", "--vendor", "apple", "--local-override", str(dataset)
+    )
     assert result.exit_code == 0, result.output
-    assert urls == ["https://raw.githubusercontent.com/github/gemoji/fadaeaf1f1a9be82b321316a6c5502e43138b2f6/db/emoji.json"]
+    assert urls == [
+        "https://raw.githubusercontent.com/github/gemoji/fadaeaf1f1a9be82b321316a6c5502e43138b2f6/db/emoji.json"
+    ]
     assert Path(invoke(terminal, "grinning").stdout.strip()).read_bytes() == png()
-    assert invoke(terminal, "install", "--local-override", str(dataset), "--release", "v1").exit_code == 2
+    assert (
+        invoke(
+            terminal, "install", "--local-override", str(dataset), "--release", "v1"
+        ).exit_code
+        == 2
+    )
     assert invoke(terminal, "install", "--aliases", str(aliases)).exit_code == 2
 
 
 def test_local_source_keeps_successful_vendors_after_failure(resources, terminal):
     dataset, aliases = resources
     (dataset / "images/apple/grinning face.png").write_bytes(b"broken")
-    result = invoke(terminal, "install", "--vendor", "apple", "--vendor", "google",
-                    "--local-override", str(dataset), "--aliases", str(aliases))
+    result = invoke(
+        terminal,
+        "install",
+        "--vendor",
+        "apple",
+        "--vendor",
+        "google",
+        "--local-override",
+        str(dataset),
+        "--aliases",
+        str(aliases),
+    )
     assert result.exit_code != 0
     assert "google:" in invoke(terminal, "status").stdout
     assert Path(invoke(terminal, "grinning").stdout.strip()).read_bytes() == png("blue")
 
 
-@pytest.mark.parametrize('options', [
-    ['--url'], ['--data-url'], ['--url-file'],
-    ['--vendor', 'apple', '--url'], ['--vendor=apple', '--url'],
-    ['--skin-tone', 'dark', '--url'],
-])
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--url"],
+        ["--data-url"],
+        ["--url-file"],
+        ["--vendor", "apple", "--url"],
+        ["--vendor=apple", "--url"],
+        ["--skin-tone", "dark", "--url"],
+    ],
+)
 def test_lookup_options_work_before_or_after_shortcode(resources, terminal, options):
     dataset, aliases = resources
-    assert invoke(terminal, 'install', '--vendor', 'apple', '--local-override', str(dataset), '--aliases', str(aliases)).exit_code == 0
-    before = invoke(terminal, *options, 'wave')
-    after = invoke(terminal, 'wave', *options)
+    assert (
+        invoke(
+            terminal,
+            "install",
+            "--vendor",
+            "apple",
+            "--local-override",
+            str(dataset),
+            "--aliases",
+            str(aliases),
+        ).exit_code
+        == 0
+    )
+    before = invoke(terminal, *options, "wave")
+    after = invoke(terminal, "wave", *options)
     assert before.exit_code == after.exit_code == 0, before.output
     assert before.stdout == after.stdout

@@ -1,4 +1,5 @@
 """Command-line access to offline vendor artwork."""
+
 from contextlib import ExitStack, contextmanager, nullcontext
 import sys
 import tempfile
@@ -21,7 +22,14 @@ def operation(*, write: bool = False, lock: bool = True) -> Iterator[Store]:
         store = Store()
         with store.locked(exclusive=write) if lock else nullcontext():
             yield store
-    except (OSError, ValueError, KeyError, TypeError, requests.RequestException, zipfile.BadZipFile) as error:
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        TypeError,
+        requests.RequestException,
+        zipfile.BadZipFile,
+    ) as error:
         raise click.ClickException(str(error)) from error
 
 
@@ -31,7 +39,9 @@ def operation(*, write: bool = False, lock: bool = True) -> Iterator[Store]:
 @click.option("--url", "--data-url", "as_url", is_flag=True)
 @click.option("--url-file", is_flag=True)
 @click.option("--skin-tone", type=click.Choice(TONES))
-def lookup(alias: str, vendor: str | None, as_url: bool, url_file: bool, skin_tone: str | None) -> None:
+def lookup(
+    alias: str, vendor: str | None, as_url: bool, url_file: bool, skin_tone: str | None
+) -> None:
     """Print an absolute PNG path (or preview URL) for a GitHub shortcode."""
     if as_url and url_file:
         raise click.UsageError("Choose either --url or --url-file")
@@ -40,7 +50,9 @@ def lookup(alias: str, vendor: str | None, as_url: bool, url_file: bool, skin_to
         index, records = store.collection(vendor)
         key = index["aliases"].get(shortcode(alias))
         if not key:
-            raise ValueError(f"Unknown shortcode {alias!r}. Use emoji list to find one.")
+            raise ValueError(
+                f"Unknown shortcode {alias!r}. Use emoji list to find one."
+            )
         entry = index["entries"][key]
         tone = skin_tone
         if tone is None and entry["base"] == key:
@@ -58,7 +70,9 @@ def lookup(alias: str, vendor: str | None, as_url: bool, url_file: bool, skin_to
         if as_url or url_file:
             path = path.with_suffix(".url")
         if not path.is_file():
-            raise ValueError(f"Missing artwork. Run emoji install --vendor {vendor} --update.")
+            raise ValueError(
+                f"Missing artwork. Run emoji install --vendor {vendor} --update."
+            )
         click.echo(path.read_text() if as_url else str(path))
 
 
@@ -67,7 +81,12 @@ class EmojiGroup(click.Group):
         # GitHub's thumbs-down alias is a positional value, not a short option.
         if args and args[0] == "-1":
             args = [":-1:", *args[1:]]
-        lookup_options = {option for param in lookup.params if isinstance(param, click.Option) for option in param.opts}
+        lookup_options = {
+            option
+            for param in lookup.params
+            if isinstance(param, click.Option)
+            for option in param.opts
+        }
         if args and args[0].split("=", 1)[0] in lookup_options:
             # Leave lookup options for the lookup command's own Click parser.
             args = ["--", *args]
@@ -90,9 +109,25 @@ def cli() -> None:
 @click.option("--release", "tag")
 @click.option("--all", "all_vendors", is_flag=True)
 @click.option("--update", is_flag=True)
-@click.option("--local-override", "--local-overidde", type=click.Path(exists=True, file_okay=False, path_type=Path), help="Install from a source dataset directory instead of GitHub Releases.")
-@click.option("--aliases", type=click.Path(exists=True, dir_okay=False, path_type=Path), help="Local gemoji JSON for --local-override; otherwise fetch pinned metadata.")
-def install(vendor: tuple[str, ...], tag: str | None, all_vendors: bool, update: bool, local_override: Path | None, aliases: Path | None) -> None:
+@click.option(
+    "--local-override",
+    "--local-overidde",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Install from a source dataset directory instead of GitHub Releases.",
+)
+@click.option(
+    "--aliases",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Local gemoji JSON for --local-override; otherwise fetch pinned metadata.",
+)
+def install(
+    vendor: tuple[str, ...],
+    tag: str | None,
+    all_vendors: bool,
+    update: bool,
+    local_override: Path | None,
+    aliases: Path | None,
+) -> None:
     """Install or explicitly update vendor artwork from a resource release."""
     if all_vendors and vendor:
         raise click.UsageError("Choose --all or --vendor")
@@ -110,15 +145,22 @@ def install(vendor: tuple[str, ...], tag: str | None, all_vendors: bool, update:
             elif sys.stdin.isatty():
                 click.echo("📦 Available vendors: " + ", ".join(VENDORS), err=True)
                 answer = click.prompt("Select vendors (comma-separated)", err=True)
-                selected = list(dict.fromkeys(part.strip() for part in answer.split(",")))
+                selected = list(
+                    dict.fromkeys(part.strip() for part in answer.split(","))
+                )
                 if any(name not in VENDORS for name in selected):
-                    raise ValueError("Choose vendor identifiers from the displayed list")
+                    raise ValueError(
+                        "Choose vendor identifiers from the displayed list"
+                    )
         if not selected:
             raise ValueError("Select a vendor: emoji install --vendor apple")
         pending = []
         for name in selected:
             if name in installed and not update:
-                click.echo(f"📦 {name} already installed; use --update to replace it.", err=True)
+                click.echo(
+                    f"📦 {name} already installed; use --update to replace it.",
+                    err=True,
+                )
             else:
                 pending.append(name)
         if not pending:
@@ -127,10 +169,17 @@ def install(vendor: tuple[str, ...], tag: str | None, all_vendors: bool, update:
         local = None
         if local_override:
             if not (local_override / "dataset.json").is_file():
-                raise ValueError("Local override must contain dataset.json (for example resources/dataset)")
-            workspace = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="emoji-local-")))
+                raise ValueError(
+                    "Local override must contain dataset.json (for example resources/dataset)"
+                )
+            workspace = Path(
+                stack.enter_context(tempfile.TemporaryDirectory(prefix="emoji-local-"))
+            )
             if aliases is None:
-                click.echo("📥 Fetching pinned GitHub shortcode metadata (use --aliases for offline installation).", err=True)
+                click.echo(
+                    "📥 Fetching pinned GitHub shortcode metadata (use --aliases for offline installation).",
+                    err=True,
+                )
                 aliases = workspace / "gemoji.json"
                 aliases.write_bytes(client.download(GEMOJI_URL))
             local = LocalDataset(local_override, aliases, workspace)
@@ -139,7 +188,9 @@ def install(vendor: tuple[str, ...], tag: str | None, all_vendors: bool, update:
         else:
             release, manifest = client.resolve(tag)
             release_name = release["tag_name"]
-            index = client.asset(release, manifest["index"]["file"], manifest["index"]["sha256"])
+            index = client.asset(
+                release, manifest["index"]["file"], manifest["index"]["sha256"]
+            )
         failures = []
         for name in pending:
             try:
@@ -152,13 +203,23 @@ def install(vendor: tuple[str, ...], tag: str | None, all_vendors: bool, update:
                     bundle = client.asset(release, asset["file"], asset["sha256"])
                 with store.locked():
                     if name in store.installed() and not update:
-                        click.echo(f"📦 {name} already installed; use --update to replace it.", err=True)
+                        click.echo(
+                            f"📦 {name} already installed; use --update to replace it.",
+                            err=True,
+                        )
                         continue
                     warning = store.install(name, release_name, index, bundle)
                 if warning:
                     click.echo(f"⚠️ {warning}", err=True)
                 click.echo(f"📦 Installed {name} ({release_name})", err=True)
-            except (OSError, ValueError, KeyError, TypeError, requests.RequestException, zipfile.BadZipFile) as error:
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                TypeError,
+                requests.RequestException,
+                zipfile.BadZipFile,
+            ) as error:
                 failures.append(name)
                 click.echo(f"❌ {name}: {error}", err=True)
         if failures:
@@ -226,7 +287,10 @@ def list_aliases(query: str, vendor: str | None) -> None:
         query = query.casefold()
         for alias, key in sorted(index["aliases"].items()):
             entry = index["entries"][key]
-            if key in records and any(query in text.casefold() for text in (alias, entry["name"], entry["cldr_name"])):
+            if key in records and any(
+                query in text.casefold()
+                for text in (alias, entry["name"], entry["cldr_name"])
+            ):
                 click.echo(alias)
 
 
@@ -236,7 +300,9 @@ def status() -> None:
     with operation() as store:
         installed = store.installed()
         if not installed:
-            click.echo("No vendors installed. Run emoji install --vendor apple.", err=True)
+            click.echo(
+                "No vendors installed. Run emoji install --vendor apple.", err=True
+            )
         for vendor, installation in installed.items():
             default = " (default)" if vendor == store.default_vendor() else ""
             click.echo(f"{vendor}: {installation['release']}{default}")

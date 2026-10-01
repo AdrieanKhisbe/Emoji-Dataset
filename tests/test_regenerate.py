@@ -30,7 +30,9 @@ def png(color):
 def response(content, status=200, headers=None):
     result = requests.Response()
     result.status_code = status
-    result._content = content if isinstance(content, bytes) else json.dumps(content).encode()
+    result._content = (
+        content if isinstance(content, bytes) else json.dumps(content).encode()
+    )
     result.headers.update(headers or {})
     return result
 
@@ -46,9 +48,20 @@ class Sources:
         source = f"source/{slug}/123/grinning-face_1f600.png"
         self.images[f"https://em-content.zobj.net/{source}"] = png(color)
         self.releases[slug] = [{"slug": version, "title": version, "date": date}]
-        self.catalogs[slug] = {"items": [{"images": [
-            {"slug": "grinning-face", "image": {"source": source}, "status": "CHANGED"}
-        ]}], "statuses": ["CHANGED"]}
+        self.catalogs[slug] = {
+            "items": [
+                {
+                    "images": [
+                        {
+                            "slug": "grinning-face",
+                            "image": {"source": source},
+                            "status": "CHANGED",
+                        }
+                    ]
+                }
+            ],
+            "statuses": ["CHANGED"],
+        }
         return self.images[f"https://em-content.zobj.net/{source}"]
 
     def get(self, url, **kwargs):
@@ -67,11 +80,20 @@ class Sources:
 
 
 def run(output, sources, *vendors):
-    args = ["--output", str(output), "--cache-dir", str(output.parent / "cache"), "--request-delay", "0"]
+    args = [
+        "--output",
+        str(output),
+        "--cache-dir",
+        str(output.parent / "cache"),
+        "--request-delay",
+        "0",
+    ]
     for vendor in vendors:
         args.extend(["--vendor", vendor])
-    with patch.object(requests.Session, "get", side_effect=sources.get), \
-         patch.object(requests.Session, "post", side_effect=sources.post):
+    with (
+        patch.object(requests.Session, "get", side_effect=sources.get),
+        patch.object(requests.Session, "post", side_effect=sources.post),
+    ):
         return generate_emoji_dataset.main(args)
 
 
@@ -85,16 +107,22 @@ def sources():
     return Sources()
 
 
-
 def test_repack_preserves_indexed_legacy_gif_and_encodes_png_preview(output):
     image = output / "images/windows/legacy.png"
     image.parent.mkdir(parents=True)
     Image.new("RGBA", (12, 12), "red").save(image, format="GIF")
     original = image.read_bytes()
-    (output / "dataset.json").write_text(json.dumps([
-        {"unicode": ["U+2194", "U+FE0F"], "name": "legacy",
-         "windows_emoji": {"image_path": str(image)}}
-    ]))
+    (output / "dataset.json").write_text(
+        json.dumps(
+            [
+                {
+                    "unicode": ["U+2194", "U+FE0F"],
+                    "name": "legacy",
+                    "windows_emoji": {"image_path": str(image)},
+                }
+            ]
+        )
+    )
     assert generate_emoji_dataset.main(["--output", str(output), "--repack"]) == 0
     assert image.read_bytes() == original
     record = json.loads((output / "vendors/windows.json").read_text())[0]
@@ -111,14 +139,23 @@ def test_repack_splits_index_and_keeps_originals_with_rgba_previews(output, sour
     original.paste((250, 123, 45, 255), (40, 20, 120, 60))
     original.save(image)
     original_bytes = image.read_bytes()
-    index = [{"unicode": ["U+1F600"], "name": "example"},
-             {"unicode": ["U+1F44B", "U+1F3FB"], "name": "no artwork"}]
+    index = [
+        {"unicode": ["U+1F600"], "name": "example"},
+        {"unicode": ["U+1F44B", "U+1F3FB"], "name": "no artwork"},
+    ]
     legacy = [dict(entry) for entry in index]
-    legacy[0]["apple_emoji"] = {"image_path": str(image), "data_uri": "old", "source": {"vendor": "apple"}}
+    legacy[0]["apple_emoji"] = {
+        "image_path": str(image),
+        "data_uri": "old",
+        "source": {"vendor": "apple"},
+    }
     (output / "dataset.json").write_text(json.dumps(legacy))
     archive = output / "dataset-big.json"
     archive.write_bytes(b"archive must stay identical")
-    with patch.object(requests.Session, "get") as get, patch.object(requests.Session, "post") as post:
+    with (
+        patch.object(requests.Session, "get") as get,
+        patch.object(requests.Session, "post") as post,
+    ):
         assert generate_emoji_dataset.main(["--output", str(output), "--repack"]) == 0
         get.assert_not_called()
         post.assert_not_called()
@@ -130,7 +167,9 @@ def test_repack_splits_index_and_keeps_originals_with_rgba_previews(output, sour
     assert records[0]["unicode"] == index[0]["unicode"]
     assert records[0]["image_path"] == str(image)
     assert json.loads((output / "vendors/google.json").read_text()) == []
-    with Image.open(io.BytesIO(base64.b64decode(records[0]["data_uri"].split(",", 1)[1]))) as preview:
+    with Image.open(
+        io.BytesIO(base64.b64decode(records[0]["data_uri"].split(",", 1)[1]))
+    ) as preview:
         assert preview.size == (72, 36)
         assert preview.mode == "RGBA"
         assert preview.getpixel((0, 0))[3] == 0
@@ -157,21 +196,39 @@ def test_oversized_vendor_json_aborts_publication(output, sources):
     assert list(output.iterdir()) == [output / "dataset.json"]
 
 
-def test_legacy_shared_path_is_split_without_overwriting_retained_artwork(output, sources):
+def test_legacy_shared_path_is_split_without_overwriting_retained_artwork(
+    output, sources
+):
     sources.vendor("apple", "red")
     sources.unicode = "# Version: 17.0\n0023 FE0F 20E3 ; fully-qualified # #️⃣ E0.6 keycap: #\n002A FE0F 20E3 ; fully-qualified # *️⃣ E2.0 keycap: *\n"
     source = "source/apple/123/keycap_23-fe0f-20e3.png"
-    sources.catalogs["apple"]["items"] = [{"images": [
-        {"slug": "keycap-number-sign", "image": {"source": source}, "status": "CHANGED"}
-    ]}]
+    sources.catalogs["apple"]["items"] = [
+        {
+            "images": [
+                {
+                    "slug": "keycap-number-sign",
+                    "image": {"source": source},
+                    "status": "CHANGED",
+                }
+            ]
+        }
+    ]
     sources.images[f"https://em-content.zobj.net/{source}"] = png("red")
     shared = output / "images/apple/keycap.png"
     shared.parent.mkdir(parents=True)
     shared.write_bytes(png("green"))
-    (output / "dataset.json").write_text(json.dumps([
-        {"unicode": [f"U+{code}", "U+FE0F", "U+20E3"], "name": "keycap", "apple_emoji": {"image_path": str(shared)}}
-        for code in ["0023", "002A"]
-    ]))
+    (output / "dataset.json").write_text(
+        json.dumps(
+            [
+                {
+                    "unicode": [f"U+{code}", "U+FE0F", "U+20E3"],
+                    "name": "keycap",
+                    "apple_emoji": {"image_path": str(shared)},
+                }
+                for code in ["0023", "002A"]
+            ]
+        )
+    )
     assert run(output, sources, "apple") == 0
     entries = generate_emoji_dataset.load_entries(output)
     paths = [Path(entry["apple_emoji"]["image_path"]) for entry in entries]
@@ -183,16 +240,28 @@ def test_legacy_shared_path_is_split_without_overwriting_retained_artwork(output
 
 def test_cache_inside_output_is_rejected_before_network_or_changes(output):
     with patch.object(requests.Session, "get") as get:
-        status = generate_emoji_dataset.main(["--output", str(output), "--cache-dir", str(output / "cache")])
+        status = generate_emoji_dataset.main(
+            ["--output", str(output), "--cache-dir", str(output / "cache")]
+        )
     assert status == 1
     get.assert_not_called()
     assert not output.exists()
 
 
-def test_rate_limited_catalog_stops_other_requests_to_same_host(output, sources, capsys):
-    with patch.object(requests.Session, "get", side_effect=sources.get), \
-         patch.object(requests.Session, "post", return_value=response(b"limited", 429, {"Retry-After": "60"})) as post:
-        status = generate_emoji_dataset.main(["--output", str(output), "--request-delay", "0"])
+def test_rate_limited_catalog_stops_other_requests_to_same_host(
+    output, sources, capsys
+):
+    with (
+        patch.object(requests.Session, "get", side_effect=sources.get),
+        patch.object(
+            requests.Session,
+            "post",
+            return_value=response(b"limited", 429, {"Retry-After": "60"}),
+        ) as post,
+    ):
+        status = generate_emoji_dataset.main(
+            ["--output", str(output), "--request-delay", "0"]
+        )
     assert status == 1
     assert post.call_count == 1
     assert "Retry-After: 60" in capsys.readouterr().err
@@ -216,7 +285,9 @@ def test_failed_publication_restores_original(output, sources):
     assert list(output.iterdir()) == [output / "dataset.json"]
 
 
-def test_failed_publication_and_rollback_keep_recoverable_original(output, sources, tmp_path):
+def test_failed_publication_and_rollback_keep_recoverable_original(
+    output, sources, tmp_path
+):
     sources.vendor("apple", "red")
     output.mkdir(parents=True)
     (output / "dataset.json").write_text("[]\n")
@@ -236,16 +307,27 @@ def test_failed_publication_and_rollback_keep_recoverable_original(output, sourc
 
 def test_vendor_mismatch_rejects_catalog_without_changes(output, sources):
     sources.vendor("apple", "red")
-    sources.catalogs["apple"]["items"][0]["images"][0]["image"]["source"] = "source/google/123/grinning-face_1f600.png"
+    sources.catalogs["apple"]["items"][0]["images"][0]["image"][
+        "source"
+    ] = "source/google/123/grinning-face_1f600.png"
     assert run(output, sources, "apple") == 1
     assert not output.exists()
 
 
 def test_all_seven_local_vendor_identifiers_select_expected_sources(output, sources):
-    mapping = {"apple": "apple", "emojione": "joypixels", "facebook": "facebook",
-               "google": "noto-color-emoji", "samsung": "samsung", "twitter": "twitter", "windows": "microsoft"}
+    mapping = {
+        "apple": "apple",
+        "emojione": "joypixels",
+        "facebook": "facebook",
+        "google": "noto-color-emoji",
+        "samsung": "samsung",
+        "twitter": "twitter",
+        "windows": "microsoft",
+    }
     expected = {}
-    for (vendor, slug), color in zip(mapping.items(), ["red", "blue", "green", "yellow", "purple", "black", "white"]):
+    for (vendor, slug), color in zip(
+        mapping.items(), ["red", "blue", "green", "yellow", "purple", "black", "white"]
+    ):
         expected[vendor] = sources.vendor(slug, color)
     assert run(output, sources) == 0
     entry = generate_emoji_dataset.load_entries(output)[0]
@@ -254,26 +336,44 @@ def test_all_seven_local_vendor_identifiers_select_expected_sources(output, sour
         assert Path(record["image_path"]).read_bytes() == expected[vendor]
         assert record["source"]["vendor"] == vendor
         assert record["source"]["release"] == "v1"
-        assert record["source"]["sha256"] == hashlib.sha256(expected[vendor]).hexdigest()
+        assert (
+            record["source"]["sha256"] == hashlib.sha256(expected[vendor]).hexdigest()
+        )
         assert "retrieved_at" in record["source"]
 
 
-def test_late_invalid_download_rolls_back_vendor_and_keeps_other_vendor_progress(output, sources):
+def test_late_invalid_download_rolls_back_vendor_and_keeps_other_vendor_progress(
+    output, sources
+):
     sources.vendor("apple", "red")
     google = sources.vendor("noto-color-emoji", "blue")
     source = "source/apple/123/waving-hand_light-skin-tone_1f44b-1f3fb_1f3fb.png"
     sources.catalogs["apple"]["items"][0]["images"].append(
-        {"slug": "waving-hand-light-skin-tone", "image": {"source": source}, "status": "NEW"}
+        {
+            "slug": "waving-hand-light-skin-tone",
+            "image": {"source": source},
+            "status": "NEW",
+        }
     )
     sources.images[f"https://em-content.zobj.net/{source}"] = b"GIF89a-not-a-png"
     old_path = output / "images/apple/old name.png"
     old_path.parent.mkdir(parents=True)
     old = png("green")
     old_path.write_bytes(old)
-    (output / "dataset.json").write_text(json.dumps([
-        {"unicode": ["U+1F600"], "name": "old name", "apple_emoji": {
-            "image_path": str(old_path), "source": {"release": "old"}}}
-    ]))
+    (output / "dataset.json").write_text(
+        json.dumps(
+            [
+                {
+                    "unicode": ["U+1F600"],
+                    "name": "old name",
+                    "apple_emoji": {
+                        "image_path": str(old_path),
+                        "source": {"release": "old"},
+                    },
+                }
+            ]
+        )
+    )
     assert run(output, sources, "apple", "google") == 1
     assert old_path.read_bytes() == old
     entries = generate_emoji_dataset.load_entries(output)
@@ -286,16 +386,28 @@ def test_tone_filename_maps_full_sequence_and_preserves_existing_path(output, so
     sources.vendor("apple", "red")
     source = "source/apple/123/waving-hand_light-skin-tone_1f44b-1f3fb_1f3fb.png"
     sources.catalogs["apple"]["items"][0]["images"].append(
-        {"slug": "waving-hand-light-skin-tone", "image": {"source": source}, "status": "NEW"}
+        {
+            "slug": "waving-hand-light-skin-tone",
+            "image": {"source": source},
+            "status": "NEW",
+        }
     )
     expected = png("blue")
     sources.images[f"https://em-content.zobj.net/{source}"] = expected
     old = output / "images/apple/old toned name.png"
     old.parent.mkdir(parents=True)
     old.write_bytes(png("green"))
-    (output / "dataset.json").write_text(json.dumps([
-        {"unicode": ["U+1F44B", "U+1F3FB"], "name": "old toned name", "apple_emoji": {"image_path": str(old)}}
-    ]))
+    (output / "dataset.json").write_text(
+        json.dumps(
+            [
+                {
+                    "unicode": ["U+1F44B", "U+1F3FB"],
+                    "name": "old toned name",
+                    "apple_emoji": {"image_path": str(old)},
+                }
+            ]
+        )
+    )
     assert run(output, sources, "apple") == 0
     entries = generate_emoji_dataset.load_entries(output)
     assert entries[1]["apple_emoji"]["image_path"] == str(old)
@@ -306,7 +418,11 @@ def test_rate_limit_preserves_output_and_cached_download_resumes_later(output, s
     sources.vendor("apple", "red")
     source = "source/apple/123/waving-hand_light-skin-tone_1f44b-1f3fb_1f3fb.png"
     sources.catalogs["apple"]["items"][0]["images"].append(
-        {"slug": "waving-hand-light-skin-tone", "image": {"source": source}, "status": "NEW"}
+        {
+            "slug": "waving-hand-light-skin-tone",
+            "image": {"source": source},
+            "status": "NEW",
+        }
     )
     url = f"https://em-content.zobj.net/{source}"
     sources.images[url] = response(b"limited", 429, {"Retry-After": "3600"})
@@ -316,7 +432,9 @@ def test_rate_limit_preserves_output_and_cached_download_resumes_later(output, s
     assert run(output, sources, "apple") == 1
     assert index.read_text() == "[]\n"
     # A second run can use the first completed download without requesting it again.
-    del sources.images["https://em-content.zobj.net/source/apple/123/grinning-face_1f600.png"]
+    del sources.images[
+        "https://em-content.zobj.net/source/apple/123/grinning-face_1f600.png"
+    ]
     sources.images[url] = png("blue")
     assert run(output, sources, "apple") == 0
     assert len(json.loads(index.read_text())) == 2
@@ -344,7 +462,9 @@ def test_symbol_keycaps_have_readable_distinct_names_and_images(output, sources)
     assert [path.read_bytes() for path in paths] == expected
 
 
-def test_missing_new_artwork_preserves_legacy_file_with_unverified_source(output, sources):
+def test_missing_new_artwork_preserves_legacy_file_with_unverified_source(
+    output, sources
+):
     sources.vendor("apple", "red")
     legacy = output / "images/apple/waving hand light skin tone.png"
     legacy.parent.mkdir(parents=True)
@@ -355,15 +475,25 @@ def test_missing_new_artwork_preserves_legacy_file_with_unverified_source(output
     entries = generate_emoji_dataset.load_entries(output)
     retained = entries[1]["apple_emoji"]
     assert Path(retained["image_path"]).read_bytes() == old_image
-    assert retained["source"] == {"vendor": "apple", "release": None, "url": None, "verified": False}
+    assert retained["source"] == {
+        "vendor": "apple",
+        "release": None,
+        "url": None,
+        "verified": False,
+    }
 
 
-def test_unicode_index_uses_selected_vendor_artwork_with_source_metadata(output, sources):
+def test_unicode_index_uses_selected_vendor_artwork_with_source_metadata(
+    output, sources
+):
     apple = sources.vendor("apple", "red")
     google = sources.vendor("noto-color-emoji", "blue")
     assert run(output, sources, "apple", "google") == 0
     entries = generate_emoji_dataset.load_entries(output)
-    assert [item["unicode"] for item in entries] == [["U+1F600"], ["U+1F44B", "U+1F3FB"]]
+    assert [item["unicode"] for item in entries] == [
+        ["U+1F600"],
+        ["U+1F44B", "U+1F3FB"],
+    ]
     for vendor, expected in [("apple", apple), ("google", google)]:
         image = entries[0][f"{vendor}_emoji"]
         assert Path(image["image_path"]).read_bytes() == expected
@@ -379,7 +509,9 @@ def test_unexpected_unicode_response_does_not_replace_existing_index(output):
     index = output / "dataset.json"
     index.write_text("[]\n")
     with patch.object(requests.Session, "get", return_value=response):
-        status = generate_emoji_dataset.main(["--output", str(output), "--vendor", "apple"])
+        status = generate_emoji_dataset.main(
+            ["--output", str(output), "--vendor", "apple"]
+        )
     assert status == 1
     assert index.read_text() == "[]\n"
 
@@ -388,8 +520,12 @@ def test_unavailable_unicode_index_leaves_dataset_untouched(output):
     output.mkdir(parents=True)
     index = output / "dataset.json"
     index.write_text("[]\n")
-    with patch.object(requests.Session, "get", side_effect=requests.ConnectionError("offline")):
-        status = generate_emoji_dataset.main(["--output", str(output), "--vendor", "apple"])
+    with patch.object(
+        requests.Session, "get", side_effect=requests.ConnectionError("offline")
+    ):
+        status = generate_emoji_dataset.main(
+            ["--output", str(output), "--vendor", "apple"]
+        )
     assert status == 1
     assert index.read_text() == "[]\n"
     assert list(output.iterdir()) == [index]
